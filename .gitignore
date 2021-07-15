@@ -1,0 +1,8 @@
+.vscode
+include
+tasks/*/data/input
+tasks/*/data/submissions
+tasks/*/src/build
+tasks/*/src/judge
+tasks/*/src/generator
+venv-mm
