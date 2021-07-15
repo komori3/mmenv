@@ -3,6 +3,8 @@ import argparse
 import subprocess
 from datetime import datetime
 import shutil
+from time import perf_counter_ns
+import json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -31,23 +33,34 @@ if __name__ == "__main__":
     os.makedirs(output_dir)
     os.makedirs(result_dir)
 
+    shutil.copy2(args.src, args.dir)
+
     with open(args.sd) as f:
         seeds = [int(seed) for seed in str(f.read()).split('\n') if seed != '']
     
+    meta_info = {}
+    meta_info['submission_datetime'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    meta_info['results'] = []
     for seed in seeds:
         input_data = subprocess.check_output([args.gen, '-s', str(seed)])
         input_file = os.path.join(input_dir, f'{seed}.in')
         with open(input_file, 'w', encoding='utf-8') as f:
             f.write(input_data.decode(encoding='utf-8'))
-        
+        elapsed = perf_counter_ns()
         output_data = subprocess.check_output([solver_exec], input=input_data)
+        elapsed = perf_counter_ns() - elapsed
         output_file = os.path.join(output_dir, f'{seed}.out')
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(output_data.decode(encoding='utf-8'))
         result_file = os.path.join(result_dir, f'{seed}.result')
         judge_cmd = [args.jdg, '-i', input_file, '-o', output_file, '-r', result_file]
         score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
-
         score = float(list(map(str.strip, score[:-1].split('=')))[1])
-        print(score)
+        print(f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}')
+        meta_info['results'].append({'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1)})
+
+    meta_file = os.path.join(args.dir, 'meta.json')
+    with open(meta_file, 'w', encoding='utf-8') as f:
+        json.dump(meta_info, f, indent=2)
     
+# python submit2.py --src ../src/solvers/solver.cpp --gen ../src/generator --jdg ../src/judge --sd ../data/seeds.txt --dir ../data/submissions/test

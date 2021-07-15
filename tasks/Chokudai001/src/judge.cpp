@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
     bool verbose;
     app.add_option("-i,--input", input_path, "input path")->required()->check(CLI::ExistingFile);
     app.add_option("-o,--output", output_path, "output path")->required()->check(CLI::ExistingFile);
-    app.add_option("-r,--result", result_path, "result path");
+    app.add_option("-r,--result", result_path, "result path")->check(CLI::NonexistentPath);
     app.add_option("-v,--verbose", verbose, "verbose mode")->default_val(false);
 
     CLI11_PARSE(app, argc, argv);
