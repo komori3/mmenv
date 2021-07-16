@@ -118,16 +118,52 @@ void load(std::istream& in) {
     }
 }
 
+constexpr int di[] = {0, -1, 0, 1};
+constexpr int dj[] = {1, 0, -1, 0};
+
+inline bool is_inside(int i, int j) {
+    return 0 <= i && i < N && 0 <= j && j < N;
+}
+
+using Path = std::vector<std::pair<int, int>>;
+
+Path build_path(int i, int j) {
+    Path ret({{i, j}});
+    A[i][j]--;
+    while(true) {
+        bool ok = false;
+        for(int d = 0; d < 4; d++) {
+            int ni = i + di[d], nj = j + dj[d];
+            if(!is_inside(ni, nj) || A[i][j] != A[ni][nj] || A[i][j] == 0) continue;
+            ok = true;
+            A[ni][nj]--;
+            ret.emplace_back(ni, nj);
+            i = ni; j = nj;
+            break;
+        }
+        if(!ok) break;
+    }
+    return ret;
+}
+
 int main() {
 
     load(std::cin);
 
+    Path ans;
+
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            while (A[i][j]--) {
-                std::cout << i + 1 << " " << j + 1 << '\n';
+            while(A[i][j]) {
+                for(const auto& path : build_path(i, j)) {
+                    ans.push_back(path);
+                }
             }
         }
+    }
+
+    for(const auto& [i, j] : ans) {
+        std::cout << i + 1 << ' ' << j + 1 << '\n';
     }
 
     return 0;
