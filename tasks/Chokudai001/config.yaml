@@ -1,0 +1,7 @@
+submissions_dir: ./data/submissions
+seed_file: ./data/seeds.txt
+generator: ./src/generator
+judge: ./src/judge
+source: ./src/solvers/solver.cpp
+metric: greater
+timelimit_ms: 10000
