@@ -61,7 +61,6 @@ SJudgeResultPtr judge(SProblemPtr prob, SSolutionPtr sol, bool verbose) {
 
     auto print_verbose_info = [&]() {
         std::cerr << format("move_chain %lld: ", res->move_chains.size()) << res->move_chains.back() << std::endl;
-        print_board();
     };
     
     int pi = -2, pj = -2;

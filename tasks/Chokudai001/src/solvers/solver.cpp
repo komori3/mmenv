@@ -100,82 +100,120 @@ Timer timer;
 IOSetup iosetup(true);
 Xorshift rnd;
 
-int N;
-std::vector<std::vector<int>> A;
 
-void load(std::istream& in) {
-    std::vector<int> a;
-    std::string buf;
-    while (in >> buf) {
-        a.push_back(stoi(buf));
-    }
-    for (N = 1;; N++) if (N * N == a.size()) break;
-    A.resize(N, std::vector<int>(N));
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            A[i][j] = a[i * N + j];
+
+struct P {
+    int x, y;
+    constexpr P(int x = 0, int y = 0) : x(x), y(y) {}
+    P& operator+=(const P& p) { x += p.x; y += p.y; return *this; }
+    P& operator-=(const P& p) { x -= p.x; y -= p.y; return *this; }
+    P& operator-() { x = -x; y = -y; return *this; }
+    bool operator<(const P& p) { return x == p.x ? y < p.y : x < p.x; }
+    std::string str() const { return "[" + std::to_string(x) + ", " + std::to_string(y) + ']'; }
+    friend std::ostream& operator<<(std::ostream& o, const P& p) { o << p.str(); return o; }
+};
+P operator+(const P& p1, const P& p2) { return P(p1) += p2; }
+P operator-(const P& p1, const P& p2) { return P(p1) -= p2; }
+
+constexpr P dir[] = {{0,1},{-1,0},{0,-1},{1,0}};
+
+using Path = std::vector<P>;
+using Board = std::vector<std::vector<int>>;
+
+struct State {
+
+    int N;
+    Board board;
+    std::vector<Path> paths;
+
+    State() {}
+    State(std::istream& in) {
+        std::vector<int> a;
+        std::string buf;
+        while (in >> buf) {
+            a.push_back(stoi(buf));
         }
-    }
-}
-
-constexpr int di[] = {0, -1, 0, 1};
-constexpr int dj[] = {1, 0, -1, 0};
-
-inline bool is_inside(int i, int j) {
-    return 0 <= i && i < N && 0 <= j && j < N;
-}
-
-using Path = std::vector<std::pair<int, int>>;
-
-Path build_path(int i, int j) {
-    Path ret({{i, j}});
-    A[i][j]--;
-    while(true) {
-        bool ok = false;
-        for(int d = 0; d < 4; d++) {
-            int ni = i + di[d], nj = j + dj[d];
-            if(!is_inside(ni, nj) || A[i][j] != A[ni][nj] || A[i][j] == 0) continue;
-            ok = true;
-            A[ni][nj]--;
-            ret.emplace_back(ni, nj);
-            i = ni; j = nj;
-            break;
-        }
-        if(!ok) break;
-    }
-    return ret;
-}
-
-std::pair<int, int> choose_top_left_highest_pos() {
-    int amax = -1, imax = -1, jmax = -1;
-    for(int i = 0; i < N; i++) {
-        for(int j = 0; j < N; j++) {
-            if(amax < A[i][j]) {
-                amax = A[i][j];
-                imax = i; jmax = j;
+        for (N = 1;; N++) if (N * N == a.size()) break;
+        board.resize(N, std::vector<int>(N));
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                board[i][j] = a[i * N + j];
             }
         }
     }
-    return {imax, jmax};
-}
 
-int main() {
+    inline bool is_inside(int x, int y) const { return 0 <= x && x < N && 0 <= y && y < N; }
+    inline bool is_inside(const P& p) const { return is_inside(p.y, p.x); }
 
-    load(std::cin);
+    void build_path(P p, const std::vector<P>& dir) {
+        Path path({p});
+        board[p.y][p.x]--;
+        while(true) {
+            bool ok = false;
+            for(const auto& dp : dir) {
+                auto np = p + dp;
+                if(!is_inside(np) || board[p.y][p.x] != board[np.y][np.x] || board[p.y][p.x] == 0) continue;
+                ok = true;
+                board[np.y][np.x]--;
+                path.push_back(np);
+                p = np;
+                break;
+            }
+            if(!ok) break;
+        }
+        paths.push_back(path);
+    }
 
-    Path ans;
+    P choose_top_left_highest_pos() const {
+        int bmax = -1, ymax = -1, xmax = -1;
+        for(int y = 0; y < N; y++) {
+            for(int x = 0; x < N; x++) {
+                if(bmax < board[y][x]) {
+                    bmax = board[y][x];
+                    ymax = y; xmax = x;
+                }
+            }
+        }
+        return P(xmax, ymax);
+    }
 
-    while(true) {
-        auto [i, j] = choose_top_left_highest_pos();
-        if(A[i][j] == 0) break;
-        for(const auto& path : build_path(i, j)) {
-            ans.push_back(path);
+    void solve(std::vector<P>& dir) {
+        while(true) {
+            auto p = choose_top_left_highest_pos();
+            if(board[p.y][p.x] == 0) break;
+            build_path(p, dir);
         }
     }
 
-    for(const auto& [i, j] : ans) {
-        std::cout << i + 1 << ' ' << j + 1 << '\n';
+    void output(std::ostream& o) const {
+        for(const auto& path : paths) {
+            for(const auto& [x, y] : path) {
+                o << y + 1 << ' ' << x + 1 << '\n';
+            }
+        }
     }
+};
+
+int main() {
+
+    State init_state(std::cin);
+    int best_score = 0;
+    State best_state(init_state);
+
+    std::vector<P> dir({{0,1},{-1,0},{0,-1},{1,0}});
+    std::sort(dir.begin(), dir.end());
+
+    do {
+        State state(init_state);
+        state.solve(dir);
+        int score = 100000 - (int)state.paths.size();
+        if(best_score < score) {
+            best_state = state;
+            best_score = score;
+        }
+    } while(std::next_permutation(dir.begin(), dir.end()));
+
+    best_state.output(std::cout);
 
     return 0;
 }
