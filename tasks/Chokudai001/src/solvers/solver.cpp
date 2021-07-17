@@ -146,19 +146,30 @@ Path build_path(int i, int j) {
     return ret;
 }
 
+std::pair<int, int> choose_top_left_highest_pos() {
+    int amax = -1, imax = -1, jmax = -1;
+    for(int i = 0; i < N; i++) {
+        for(int j = 0; j < N; j++) {
+            if(amax < A[i][j]) {
+                amax = A[i][j];
+                imax = i; jmax = j;
+            }
+        }
+    }
+    return {imax, jmax};
+}
+
 int main() {
 
     load(std::cin);
 
     Path ans;
 
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            while(A[i][j]) {
-                for(const auto& path : build_path(i, j)) {
-                    ans.push_back(path);
-                }
-            }
+    while(true) {
+        auto [i, j] = choose_top_left_highest_pos();
+        if(A[i][j] == 0) break;
+        for(const auto& path : build_path(i, j)) {
+            ans.push_back(path);
         }
     }
 
