@@ -7,9 +7,31 @@ from time import perf_counter_ns
 import json
 import yaml
 from yaml.loader import SafeLoader
+from multiprocessing import Pool
 
 def get_path(config_file_path, relpath):
     return os.path.join(os.path.dirname(config_file_path), relpath)
+
+def do_task(seed: int, generator_exec: str, solver_exec: str, judge_exec: str, input_dir: str, output_dir: str, result_dir: str) -> dict:
+    input_data = subprocess.check_output([generator_exec, '-s', str(seed)])
+    input_file = os.path.join(input_dir, f'{seed}.in')
+    with open(input_file, 'w', encoding='utf-8') as f:
+        f.write(input_data.decode(encoding='utf-8'))
+    elapsed = perf_counter_ns()
+    output_data = subprocess.check_output([solver_exec], input=input_data)
+    elapsed = perf_counter_ns() - elapsed
+    # TODO: timelimit_ms 対応
+    output_file = os.path.join(output_dir, f'{seed}.out')
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(output_data.decode(encoding='utf-8'))
+    result_file = os.path.join(result_dir, f'{seed}.result')
+    judge_cmd = [judge_exec, '-i', input_file, '-o', output_file, '-r', result_file]
+    score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
+    score = float(list(map(str.strip, score[:-1].split('=')))[1])
+    print(f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}')
+    return {'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1)}
+
+def do_task_wrapper(param): return do_task(*param)
 
 if __name__ == "__main__":
     timestamp = datetime.now()
@@ -19,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, required=True, help='config file path')
     parser.add_argument('--tag', type=str, default=f's{timestamp.strftime("%Y%m%d%H%M%S")}', help='submission tag (name)')
     parser.add_argument('--test', type=int, help='run example test for n test cases')
+    parser.add_argument('-j', '--njobs', type=int, default=1, help='multiprocess thread size')
     
     args = parser.parse_args()
 
@@ -69,24 +92,13 @@ if __name__ == "__main__":
     meta_info['submission_datetime'] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
     meta_info['tag'] = args.tag
     meta_info['results'] = []
+
+    tasks = []
     for seed in seeds:
-        input_data = subprocess.check_output([generator_exec, '-s', str(seed)])
-        input_file = os.path.join(input_dir, f'{seed}.in')
-        with open(input_file, 'w', encoding='utf-8') as f:
-            f.write(input_data.decode(encoding='utf-8'))
-        elapsed = perf_counter_ns()
-        output_data = subprocess.check_output([solver_exec], input=input_data)
-        elapsed = perf_counter_ns() - elapsed
-        # TODO: timelimit_ms 対応
-        output_file = os.path.join(output_dir, f'{seed}.out')
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(output_data.decode(encoding='utf-8'))
-        result_file = os.path.join(result_dir, f'{seed}.result')
-        judge_cmd = [judge_exec, '-i', input_file, '-o', output_file, '-r', result_file]
-        score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
-        score = float(list(map(str.strip, score[:-1].split('=')))[1])
-        print(f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}')
-        meta_info['results'].append({'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1)})
+        tasks.append([seed, generator_exec, solver_exec, judge_exec, input_dir, output_dir, result_dir])
+
+    pool = Pool(args.njobs)
+    meta_info['results'] = pool.map(do_task_wrapper, tasks)
 
     meta_file = os.path.join(submission_dir, 'meta.json')
     with open(meta_file, 'w', encoding='utf-8') as f:
@@ -95,4 +107,4 @@ if __name__ == "__main__":
     if args.test is not None:
         shutil.rmtree(submissions_dir)
 
-# python scripts/submit_by_config.py --config tasks/Chokudai001/config.yaml --tag test_submit
+# python scripts/submit_by_config.py --config tasks/Chokudai001/config.yaml --tag test_submit -j 10
