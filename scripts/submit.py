@@ -42,7 +42,8 @@ if __name__ == "__main__":
     parser.add_argument('--tag', type=str, default=f's{timestamp.strftime("%Y%m%d%H%M%S")}', help='submission tag (name)')
     parser.add_argument('--test', type=int, help='run example test for n test cases')
     parser.add_argument('-j', '--njobs', type=int, default=1, help='multiprocess thread size')
-    
+    parser.add_argument('--vis', action='store_true', help='include opencv files')
+
     args = parser.parse_args()
 
     config_file = args.config
@@ -71,6 +72,11 @@ if __name__ == "__main__":
 
     solver_exec = './solver'
     build_cmd = ['g++', '-O2', '-Wall', '-Wextra', '-std=c++17', '-o', solver_exec, source_file]
+    if args.vis:
+        build_cmd += [
+            '-I/usr/local/include/opencv4', '-L/usr/local/lib',
+            '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
+            ]
     subprocess.run(build_cmd).check_returncode()
 
     input_dir = os.path.join(submission_dir, 'in')

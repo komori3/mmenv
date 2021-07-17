@@ -30,7 +30,6 @@ def show_standings(dict_submission_to_total_score):
 if __name__ == "__main__":
     timestamp = datetime.now()
 
-    # TODO: 入力ファイル読み込み可能にする
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True, help='config file path')
     
