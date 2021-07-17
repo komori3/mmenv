@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True, help='config file path')
     parser.add_argument('--tag', type=str, default=f's{timestamp.strftime("%Y%m%d%H%M%S")}', help='submission tag (name)')
+    parser.add_argument('--test', action='store_true', help='run example test')
     
     args = parser.parse_args()
 
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     with open(config_file, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=SafeLoader)
 
-    submissions_dir = get_path(config_file, config['submissions_dir'])
+    submissions_dir = get_path(config_file, config['submissions_dir']) if not args.test else 'example_test'
     submission_dir = os.path.join(submissions_dir, args.tag)
     assert not os.path.exists(submission_dir), f'Submission directory {submission_dir} already exists.'
 
@@ -60,6 +61,9 @@ if __name__ == "__main__":
 
     with open(seed_file) as f:
         seeds = [int(seed) for seed in str(f.read()).split('\n') if seed != '']
+        if args.test:
+            num_seeds = len(seeds)
+            seeds = seeds[:min(num_seeds, 10)]
     
     meta_info = {}
     meta_info['submission_datetime'] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -73,6 +77,7 @@ if __name__ == "__main__":
         elapsed = perf_counter_ns()
         output_data = subprocess.check_output([solver_exec], input=input_data)
         elapsed = perf_counter_ns() - elapsed
+        # TODO: timelimit_ms 対応
         output_file = os.path.join(output_dir, f'{seed}.out')
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(output_data.decode(encoding='utf-8'))
@@ -86,5 +91,8 @@ if __name__ == "__main__":
     meta_file = os.path.join(submission_dir, 'meta.json')
     with open(meta_file, 'w', encoding='utf-8') as f:
         json.dump(meta_info, f, indent=2)
+
+    if args.test:
+        shutil.rmtree(submissions_dir)
 
 # python scripts/submit_by_config.py --config tasks/Chokudai001/config.yaml --tag test_submit
