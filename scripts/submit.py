@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True, help='config file path')
     parser.add_argument('--tag', type=str, default=f's{timestamp.strftime("%Y%m%d%H%M%S")}', help='submission tag (name)')
-    parser.add_argument('--test', action='store_true', help='run example test')
+    parser.add_argument('--test', type=int, help='run example test for n test cases')
     
     args = parser.parse_args()
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     with open(config_file, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=SafeLoader)
 
-    submissions_dir = get_path(config_file, config['submissions_dir']) if not args.test else 'example_test'
+    submissions_dir = get_path(config_file, config['submissions_dir']) if args.test is None else 'example_test'
     submission_dir = os.path.join(submissions_dir, args.tag)
     assert not os.path.exists(submission_dir), f'Submission directory {submission_dir} already exists.'
 
@@ -61,9 +61,9 @@ if __name__ == "__main__":
 
     with open(seed_file) as f:
         seeds = [int(seed) for seed in str(f.read()).split('\n') if seed != '']
-        if args.test:
+        if args.test is not None:
             num_seeds = len(seeds)
-            seeds = seeds[:min(num_seeds, 10)]
+            seeds = seeds[:min(num_seeds, args.test)]
     
     meta_info = {}
     meta_info['submission_datetime'] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     with open(meta_file, 'w', encoding='utf-8') as f:
         json.dump(meta_info, f, indent=2)
 
-    if args.test:
+    if args.test is not None:
         shutil.rmtree(submissions_dir)
 
 # python scripts/submit_by_config.py --config tasks/Chokudai001/config.yaml --tag test_submit
