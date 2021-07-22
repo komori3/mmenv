@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <random>
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
+// #include <opencv2/core.hpp>
+// #include <opencv2/imgproc.hpp>
+// #include <opencv2/highgui.hpp>
 #pragma GCC target("avx2")
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
@@ -182,7 +182,6 @@ struct State {
             auto p = choose_top_left_highest_pos();
             if(board[p.y][p.x] == 0) break;
             build_path(p, dir);
-            if(paths.size() % 100 == 0) vis(1);
         }
     }
 
@@ -193,36 +192,6 @@ struct State {
             }
         }
     }
-
-#ifdef HAVE_OPENCV_CORE
-    cv::Scalar get_color(int value) const {
-        int r = (int)round(255 * value / 100.0);
-        return cv::Scalar(255 - r, 255 - r, 255);
-    }
-    void vis(int delay = 0) {
-        int grid_size = 900 / N;
-        int height = grid_size * N, width = grid_size * N;
-        cv::Mat_<cv::Vec3b> img(height, width, cv::Vec3b(255,255,255));
-        for(int y = 0; y < N; y++) {
-            for(int x = 0; x < N; x++) {
-                cv::Rect roi(x * grid_size, y * grid_size, grid_size, grid_size);
-                cv::Mat_<cv::Vec3b> img_roi(grid_size, grid_size, cv::Vec3b(0,0,0));
-                cv::rectangle(img_roi, cv::Rect(0,0,grid_size,grid_size), get_color(board[y][x]), cv::FILLED);
-                cv::putText(
-                    img_roi,
-                     std::to_string(board[y][x]),
-                      cv::Point(grid_size / 4, grid_size * 2 / 3),
-                       cv::FONT_HERSHEY_SIMPLEX,
-                       0.5,
-                       cv::Scalar(0,0,0)
-                       );
-                img_roi.copyTo(img(roi));
-            }
-        }
-        cv::imshow("img", img);
-        cv::waitKey(delay);
-    }
-#endif
 };
 
 int main() {
@@ -230,8 +199,6 @@ int main() {
     State init_state(std::cin);
     int best_score = 0;
     State best_state(init_state);
-
-    init_state.vis(0);
 
     std::vector<P> dir({{0,1},{-1,0},{0,-1},{1,0}});
     std::sort(dir.begin(), dir.end());

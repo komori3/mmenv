@@ -1,3 +1,8 @@
+id: 0
+tag: 'Chokudai001'
+name: 'Chokudai Contest 001'
+category: 'AtCoder Marathon'
+
 submissions_dir: ./data/submissions
 seed_file: ./data/seeds.txt
 generator: ./src/generator

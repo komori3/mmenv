@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+
+{% block additional_header %}
+
+<style>
+  #task .tablesorter-header-inner::after { content: '▼'; }
+</style>
+
+<title>{{title}} - mmtools</title>
+
+{% endblock %}
+
+{% block contents %}
+<br>
+<h2>{{task.name}}</h2>
+<table class="table tablesorter" id="task">
+    <thead>
+        <tr>
+            {% for col in submissions.header %}
+            <th>{{col}}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in submissions.rows %}
+    <tr class="{{row.value}}">
+        {% for col in row %}
+        <td {% if 'bgcolor' in col %}bgcolor="{{col.bgcolor}}"{% endif %}>
+            {% if 'link' in col %}<a href="./{{task.tag}}/{{col.link}}">{% endif %}
+                {{col.value}}
+            {% if 'link' in col %}</a>{% endif %}
+        </td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.min.js" integrity="sha512-qzgd5cYSZcosqpzpn7zF2ZId8f/8CHmFKZ8j7mU4OUXTNRd5g+ZHBPsgKEwoqxCtdQvExE5LprwwPAgoicguNg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.widgets.min.js" integrity="sha512-dj/9K5GRIEZu+Igm9tC16XPOTz0RdPk9FGxfZxShWf65JJNU2TjbElGjuOo3EhwAJRPhJxwEJ5b+/Ouo+VqZdQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    $(document).ready(function() {
+        $("#task").tablesorter();
+    });
+</script>
+{% endblock %}

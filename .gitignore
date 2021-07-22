@@ -6,3 +6,5 @@ tasks/*/src/build
 tasks/*/src/judge
 tasks/*/src/generator
 venv-mm
+solver
+__pycache__
