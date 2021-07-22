@@ -55,17 +55,18 @@ if __name__ == "__main__":
     submission_to_score = {}
     for submission_dir_name in os.listdir(submissions_dir):
         submission_dir = os.path.join(submissions_dir, submission_dir_name)
-        meta_file = os.path.join(submission_dir, 'meta.json')
-        with open(meta_file, 'r', encoding='utf-8') as f:
-            meta_info = json.load(f)
+        summary_file = os.path.join(submission_dir, 'summary.json')
+        with open(summary_file, 'r', encoding='utf-8') as f:
+            summary = json.load(f)
         seed_to_score = {}
-        for result in meta_info['results']:
+        for result in summary['results']:
             seed_to_score[result['seed']] = result['score']
         score = 0
         for seed in seeds:
             if seed in seed_to_score:
                 score += seed_to_score[seed]
-        submission_to_score[meta_info['tag']] = score
+        submission_to_score[summary['tag']] = score
 
     show_standings(submission_to_score)
 
+# python scripts/evaluate.py --config tasks/Chokudai001/config.yaml

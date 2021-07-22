@@ -94,23 +94,29 @@ if __name__ == "__main__":
             num_seeds = len(seeds)
             seeds = seeds[:min(num_seeds, args.test)]
     
-    meta_info = {}
-    meta_info['submission_datetime'] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-    meta_info['tag'] = args.tag
-    meta_info['results'] = []
+    summary = {}
+    summary['submission_datetime'] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    summary['tag'] = args.tag
 
     tasks = []
     for seed in seeds:
         tasks.append([seed, generator_exec, solver_exec, judge_exec, input_dir, output_dir, result_dir])
 
     pool = Pool(args.njobs)
-    meta_info['results'] = pool.map(do_task_wrapper, tasks)
+    summary['results'] = pool.map(do_task_wrapper, tasks)
 
-    meta_file = os.path.join(submission_dir, 'meta.json')
-    with open(meta_file, 'w', encoding='utf-8') as f:
-        json.dump(meta_info, f, indent=2)
+    score = 0
+    for result in summary['results']:
+        score += result['score']
+    
+    print(f'total score = {score}')
+    summary['score'] = score
+
+    summary_file = os.path.join(submission_dir, 'summary.json')
+    with open(summary_file, 'w', encoding='utf-8') as f:
+        json.dump(summary, f, indent=2)
 
     if args.test is not None:
         shutil.rmtree(submissions_dir)
 
-# python scripts/submit_by_config.py --config tasks/Chokudai001/config.yaml --tag test_submit -j 10
+# python scripts/submit.py --config tasks/Chokudai001/config.yaml --tag test_submit -j 10
