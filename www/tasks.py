@@ -55,7 +55,7 @@ def set_bgcolor(row: list):
     max_score = -1e9
     min_score = 1e9
     for col in range(1, len(row)):
-        if 'value' in row[col]:
+        if row[col]['status'] == 'AC':
             max_score = max(max_score, row[col]['value'])
             min_score = min(min_score, row[col]['value'])
     col_white = [255, 255, 255]
@@ -70,7 +70,7 @@ def set_bgcolor(row: list):
     def get_color(ratio: float):
         return rgb(*arrsum(arrmul(col_green, ratio), arrmul(col_white, 1.0 - ratio)))
     for col in range(1, len(row)):
-        if 'value' in row[col]:
+        if row[col]['status'] == 'AC':
             row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
         else:
             row[col]['bgcolor'] = rgb(*col_red)
@@ -80,7 +80,7 @@ def set_link(header: list, rows: dict):
     for seed, row in rows.items():
         if type(seed) is not int: continue
         for j in range(1, len(header)):
-            if 'value' in row[j]:
+            if row[j]['status'] == 'AC':
                 row[j]['link'] = os.path.join(header[j], str(seed))
 
 def struct_submissions(submissions_dir: str):
@@ -103,10 +103,13 @@ def struct_submissions(submissions_dir: str):
         for result in submission['results']:
             seed = result['seed']
             if not seed in rows:
+                # 0 列目は seed number (or 'all')
                 set_row(rows, seed)
                 rows[seed][0]['value'] = seed
             rows[seed][col]['value'] = result['score']
+            rows[seed][col]['status'] = result['status']
         rows['all'][col]['value'] = submission['score']
+        rows['all'][col]['status'] = 'AC'
     
     set_link(header, rows)
 
