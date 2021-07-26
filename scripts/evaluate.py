@@ -60,6 +60,7 @@ if __name__ == "__main__":
             summary = json.load(f)
         seed_to_score = {}
         for result in summary['results']:
+            # TODO: -1 対応
             seed_to_score[result['seed']] = result['score']
         score = 0
         for seed in seeds:

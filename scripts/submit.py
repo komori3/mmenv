@@ -12,24 +12,46 @@ from multiprocessing import Pool
 def get_path(config_file_path, relpath):
     return os.path.join(os.path.dirname(config_file_path), relpath)
 
-def do_task(seed: int, generator_exec: str, solver_exec: str, judge_exec: str, input_dir: str, output_dir: str, result_dir: str) -> dict:
-    input_data = subprocess.check_output([generator_exec, '-s', str(seed)])
-    input_file = os.path.join(input_dir, f'{seed}.in')
-    with open(input_file, 'w', encoding='utf-8') as f:
-        f.write(input_data.decode(encoding='utf-8'))
-    elapsed = perf_counter_ns()
-    output_data = subprocess.check_output([solver_exec], input=input_data)
-    elapsed = perf_counter_ns() - elapsed
-    # TODO: timelimit_ms 対応
+def failed_with_status(seed: int, status: str) -> dict:
+    print(f'seed = {seed}, score = -1, elapsed_ms = -1, status = {status}')
+    return {'seed': seed, 'score': -1, 'elapsed_ms': -1, 'status': status}
+
+def do_task(seed: int, generator_exec: str, solver_exec: str, judge_exec: str, input_dir: str, output_dir: str, error_dir: str, timelimit_ms: int) -> dict:
+    # generate
+    try:
+        input_data = subprocess.check_output([generator_exec, '-s', str(seed)])
+        input_file = os.path.join(input_dir, f'{seed}.in')
+        with open(input_file, 'w', encoding='utf-8') as f:
+            f.write(input_data.decode(encoding='utf-8'))
+    except Exception as e:
+        print(e)
+        return failed_with_status(seed, 'GE') # generator error
+    # exec
     output_file = os.path.join(output_dir, f'{seed}.out')
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(output_data.decode(encoding='utf-8'))
-    result_file = os.path.join(result_dir, f'{seed}.result')
-    judge_cmd = [judge_exec, '-i', input_file, '-o', output_file, '-r', result_file]
-    score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
-    score = float(list(map(str.strip, score[:-1].split('=')))[1])
-    print(f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}')
-    return {'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1)}
+    error_file = os.path.join(error_dir, f'{seed}.err')
+    try:
+        with open(output_file, 'w', encoding='utf-8') as out:
+            with open(error_file, 'w', encoding='utf-8') as err:
+                elapsed = perf_counter_ns()
+                subprocess.run([solver_exec], input=input_data, stdout=out, stderr=err, timeout=timelimit_ms/1000.0)
+                elapsed = perf_counter_ns() - elapsed
+    except subprocess.TimeoutExpired as e:
+        print(e)
+        return failed_with_status(seed, 'TLE') # time limit exceeded
+    except Exception as e:
+        print(e)
+        return failed_with_status(seed, 'RE') # runtime error
+    # judge
+    try:
+        judge_cmd = [judge_exec, '-i', input_file, '-o', output_file]
+        score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
+        score = float(list(map(str.strip, score[:-1].split('=')))[1])
+    except Exception as e:
+        print(e)
+        return failed_with_status(seed, 'JE') # judge error
+
+    print(f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}, status: AC')
+    return {'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1), 'status': 'AC'}
 
 def do_task_wrapper(param): return do_task(*param)
 
@@ -81,10 +103,10 @@ if __name__ == "__main__":
 
     input_dir = os.path.join(submission_dir, 'in')
     output_dir = os.path.join(submission_dir, 'out')
-    result_dir = os.path.join(submission_dir, 'result')
+    error_dir = os.path.join(submission_dir, 'err')
     os.makedirs(input_dir)
     os.makedirs(output_dir)
-    os.makedirs(result_dir)
+    os.makedirs(error_dir)
 
     shutil.copy2(source_file, submission_dir)
 
@@ -100,7 +122,7 @@ if __name__ == "__main__":
 
     tasks = []
     for seed in seeds:
-        tasks.append([seed, generator_exec, solver_exec, judge_exec, input_dir, output_dir, result_dir])
+        tasks.append([seed, generator_exec, solver_exec, judge_exec, input_dir, output_dir, error_dir, config['timelimit_ms']])
 
     pool = Pool(args.njobs)
     summary['results'] = pool.map(do_task_wrapper, tasks)
