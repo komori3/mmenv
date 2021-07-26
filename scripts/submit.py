@@ -109,6 +109,9 @@ if __name__ == "__main__":
     assert os.path.exists(
         judge_exec), f'Source file {source_file} does not exist.'
 
+    if args.vis:
+        assert args.test is not None, f'Visualize mode is only available if args.test is True.'
+
     # build
     try:
         solver_exec = './solver'
@@ -169,6 +172,7 @@ if __name__ == "__main__":
         print(e)
         sleep(1)
         shutil.rmtree(submission_dir)
+        exit(1)
 
     if args.test is not None:
         shutil.rmtree(submissions_dir)
