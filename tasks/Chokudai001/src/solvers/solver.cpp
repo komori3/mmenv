@@ -213,6 +213,7 @@ int main() {
         }
     } while(std::next_permutation(dir.begin(), dir.end()));
 
+    std::cerr << best_score << std::endl;
     best_state.output(std::cout);
 
     return 0;

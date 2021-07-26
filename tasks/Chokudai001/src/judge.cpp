@@ -120,11 +120,9 @@ int main(int argc, char** argv) {
 
     std::string input_path;
     std::string output_path;
-    std::string result_path;
     bool verbose;
     app.add_option("-i,--input", input_path, "input path")->required()->check(CLI::ExistingFile);
     app.add_option("-o,--output", output_path, "output path")->required()->check(CLI::ExistingFile);
-    app.add_option("-r,--result", result_path, "result path")->check(CLI::NonexistentPath);
     app.add_option("-v,--verbose", verbose, "verbose mode")->default_val(false);
 
     CLI11_PARSE(app, argc, argv);
@@ -138,12 +136,6 @@ int main(int argc, char** argv) {
     auto result = judge(prob, sol, verbose);
 
     std::cout << format("Score = %d", result->score) << std::endl;
-
-    if (!result_path.empty()) {
-        std::ofstream result_file(result_path);
-        result_file << result->to_json();
-        result_file.close();
-    }
 
     return 0;
 }
