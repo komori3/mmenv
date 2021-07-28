@@ -172,6 +172,8 @@ if __name__ == "__main__":
         print(e)
         sleep(1)
         shutil.rmtree(submission_dir)
+        if args.test is not None:
+            shutil.rmtree(submissions_dir)
         exit(1)
 
     if args.test is not None:

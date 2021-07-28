@@ -71,7 +71,10 @@ def set_bgcolor(row: list):
         return rgb(*arrsum(arrmul(col_green, ratio), arrmul(col_white, 1.0 - ratio)))
     for col in range(1, len(row)):
         if row[col]['status'] == 'AC':
-            row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
+            if max_score == min_score:
+                row[col]['bgcolor'] = rgb(*col_green)
+            else:
+                row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
         else:
             row[col]['bgcolor'] = rgb(*col_red)
     return row
