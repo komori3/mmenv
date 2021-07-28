@@ -1,4 +1,5 @@
 #include "CLI11.hpp"
+#include "atcoder-util.hpp"
 #include "contest_types.hpp"
 
 int main(int argc, char** argv) {

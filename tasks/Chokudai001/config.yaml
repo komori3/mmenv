@@ -5,8 +5,8 @@ category: 'AtCoder Marathon'
 
 submissions_dir: ./data/submissions
 seed_file: ./data/seeds.txt
-generator: ./src/generator
-judge: ./src/judge
+generator: ./src/build/generator
+judge: ./src/build/judge
 source: ./src/solvers/solver.cpp
 metric: greater
 timelimit_ms: 10000
