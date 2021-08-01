@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     source_file = get_path(config_file, config['source'])
     assert os.path.exists(
-        judge_exec), f'Source file {source_file} does not exist.'
+        source_file), f'Source file {source_file} does not exist.'
 
     if args.vis:
         assert args.test is not None, f'Visualize mode is only available if args.test is True.'

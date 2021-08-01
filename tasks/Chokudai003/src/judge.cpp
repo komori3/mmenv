@@ -49,7 +49,7 @@ std::vector<Blob> enum_blobs(const std::vector<std::string>& S) {
     std::vector<std::vector<bool>> used(N, std::vector<bool>(N, false));
     for (int r = 0; r < N; r++) {
         for (int c = 0; c < N; c++) {
-            if (S[r][c] != 'o' && S[r][c] != 'x') continue;
+            if (used[r][c] || (S[r][c] != 'o' && S[r][c] != 'x')) continue;
             Blob blob; blob.ch = S[r][c];
             std::queue<int> qu;
             used[r][c] = true;
