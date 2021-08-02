@@ -339,19 +339,25 @@ int main() {
     auto spiral = generate_spiral(N);
     auto zigzag = generate_zigzag(N);
 
-    for (const auto& route : {spiral, zigzag}) {
-        State state(init_state);
-        state.solve(route, perm);
-        if (state.moves.size() < best_score) {
-            best_score = state.moves.size();
-            best_state = state;
+    int loop = 0;
+    while (timer.elapsedMs() < 3000) {
+        for (const auto& route : { spiral, zigzag }) {
+            State state(init_state);
+            state.solve(route, perm);
+            if (state.moves.size() < best_score) {
+                best_score = state.moves.size();
+                best_state = state;
+                dump(best_score);
+            }
+            loop++;
         }
+        shuffle_vector(perm, rnd);
     }
     
     best_state.output(out);
     out.flush();
 
-    dump(best_score, timer.elapsedMs());
+    dump(best_score, loop, timer.elapsedMs());
 
     return 0;
 }
