@@ -118,11 +118,13 @@ using std::vector; using std::string; using std::cerr; using std::cout; using st
 struct Point {
     int i, j;
     constexpr Point(int i = 0, int j = 0) : i(i), j(j) {}
-    Point& operator+=(const Point& p) { i += p.i; j += p.j; return *this; }
-    Point& operator-=(const Point& p) { i -= p.i; j -= p.j; return *this; }
-    Point& operator-() { i = -i; j = -j; return *this; }
-    bool operator<(const Point& p) { return i == p.i ? j < p.j : i < p.i; }
-    int distance(const Point& p) const { return abs(i - p.i) + abs(j - p.j); }
+    inline Point& operator+=(const Point& p) { i += p.i; j += p.j; return *this; }
+    inline Point& operator-=(const Point& p) { i -= p.i; j -= p.j; return *this; }
+    inline Point& operator-() { i = -i; j = -j; return *this; }
+    inline bool operator==(const Point& p) const { return i == p.i && j == p.j; }
+    inline bool operator!=(const Point& p) const { return !(*this == p); }
+    inline bool operator<(const Point& p) const { return i == p.i ? j < p.j : i < p.i; }
+    inline int distance(const Point& p) const { return abs(i - p.i) + abs(j - p.j); }
     std::string str() const { return "[" + std::to_string(i) + ", " + std::to_string(j) + ']'; }
     friend std::ostream& operator<<(std::ostream& o, const Point& p) { o << p.str(); return o; }
 };
@@ -130,146 +132,208 @@ Point operator+(const Point& p1, const Point& p2) { return Point(p1) += p2; }
 Point operator-(const Point& p1, const Point& p2) { return Point(p1) -= p2; }
 int distance(const Point& p1, const Point& p2) { return p1.distance(p2); }
 
-constexpr Point dir[] = { {0,1},{-1,0},{0,-1},{1,0} };
+constexpr Point dir[] = { {0,1},{1,0},{0,-1},{-1,0} };
 
 using Path = std::vector<Point>;
 using Board = std::vector<std::vector<int>>;
 using Move = std::tuple<int, int, int, int>;
 
-struct State {
+namespace NSpiral {
+    struct State {
 
-    int N, C;
-    vector<int> cnt;
-    vector<vector<int>> board;
-    vector<vector<bool>> fixed;
+        int N, C;
+        vector<int> cnt;
+        Board board;
+        vector<vector<bool>> fixed;
 
-    vector<Move> moves;
+        vector<Move> moves;
 
-    State(std::istream& in) {
-        in >> N >> C;
-        board.resize(N, vector<int>(N));
-        in >> board;
-        fixed.resize(N, vector<bool>(N, false));
-        cnt.resize(C, 0);
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                cnt[board[i][j]]++;
-            }
-        }
-        dump(cnt);
-    }
-
-    Path get_shortest_path(int x, const Point& dst) const {
-        //// dst に最も近い数字 x の場所を求めて、経路復元
-        //// 蛇腹なら線形でいける
-        int mindist = 1e9;
-        Point src;
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                if (fixed[i][j] || board[i][j] != x) continue;
-                int dist = Point(i, j).distance(dst);
-                if (dist < mindist) {
-                    mindist = dist;
-                    src = Point(i, j);
-                }
-            }
-        }
-
-        Path path({ src });
-        // j を解決してから、i を解決
-        while (src.j < dst.j) {
-            src.j++;
-            path.push_back(src);
-        }
-        while (src.j > dst.j) {
-            src.j--;
-            path.push_back(src);
-        }
-        while (src.i > dst.i) {
-            src.i--;
-            path.push_back(src);
-        }
-        assert(src.i >= dst.i);
-        return path;
-    }
-
-    void do_moves(const Path& path) {
-        for (int i = 0; i < (int)path.size() - 1; i++) {
-            const auto& p1 = path[i];
-            const auto& p2 = path[i + 1];
-            std::swap(board[p1.i][p1.j], board[p2.i][p2.j]);
-            moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
-        }
-    }
-
-    void solve(const vector<int>& perm) {
-        // 蛇腹状のターゲットを作成
-        vector<int> target;
-        Path zigzag;
-        for (int i = 0; i < N; i++) {
-            if (i % 2 == 0) {
+        State(std::istream& in) {
+            in >> N >> C;
+            board.resize(N, vector<int>(N));
+            in >> board;
+            fixed.resize(N, vector<bool>(N, false));
+            cnt.resize(C, 0);
+            for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
-                    zigzag.emplace_back(i, j);
-                }
-            }
-            else {
-                for (int j = N - 1; j >= 0; j--) {
-                    zigzag.emplace_back(i, j);
+                    cnt[board[i][j]]++;
                 }
             }
         }
 
-        for (int c : perm) {
-            for (int i = 0; i < cnt[c]; i++) {
-                target.push_back(c);
+        inline bool is_inside(const Point& p) const {
+            return 0 <= p.i && p.i < N && 0 <= p.j && p.j < N;
+        }
+
+        Path get_shortest_path(int x, const Point& dst) const {
+            //// dst に最も近い数字 x の場所を求めて、経路復元
+            int mindist = 1e9;
+            Point src;
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    if (fixed[i][j] || board[i][j] != x) continue;
+                    int dist = Point(i, j).distance(dst);
+                    if (dist < mindist) {
+                        mindist = dist;
+                        src = Point(i, j);
+                    }
+                }
+            }
+
+            Path path({ src });
+            
+            while (src != dst) {
+                for (int d = 0; d < 4; d++) {
+                    auto p = src + dir[d];
+                    int dist = p.distance(dst);
+                    if (is_inside(p) && !fixed[p.i][p.j] && dist < mindist) {
+                        src = p;
+                        path.push_back(p);
+                        mindist = dist;
+                        break;
+                    }
+                }
+            }
+            return path;
+        }
+
+        void do_moves(const Path& path) {
+            for (int i = 0; i < (int)path.size() - 1; i++) {
+                const auto& p1 = path[i];
+                const auto& p2 = path[i + 1];
+                std::swap(board[p1.i][p1.j], board[p2.i][p2.j]);
+                moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
             }
         }
 
-        // 蛇腹状のパスに沿って揃えていく
-        // elems[idx] != target[idx] となるような idx に対して
-        // 既に揃えられたマス以外を通って数字 target[idx] を zigzag[idx] に移動させるような最短パスを求める
-        // 関数: ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
-        for (int idx = 0; idx < N * N; idx++) {
-            int i = zigzag[idx].i, j = zigzag[idx].j;
-            if (board[i][j] == target[idx]) {
+        void solve(const vector<int>& perm) {
+            // 螺旋状のターゲットを作成
+            vector<int> target;
+            Path spiral;
+            {
+                vector<vector<bool>> visited(N, vector<bool>(N, false));
+                Point p(0, 0);
+                int d = 0;
+                spiral.push_back(p);
+                visited[p.i][p.j] = true;
+                while (true) {
+                    if (is_inside(p + dir[d]) && !visited[p.i + dir[d].i][p.j + dir[d].j]) {
+                        p += dir[d];
+                        spiral.push_back(p);
+                        visited[p.i][p.j] = true;
+                    }
+                    else if (is_inside(p + dir[(d + 1) & 3]) && !visited[p.i + dir[(d + 1) & 3].i][p.j + dir[(d + 1) & 3].j]) {
+                        d = (d + 1) & 3;
+                        p += dir[d];
+                        spiral.push_back(p);
+                        visited[p.i][p.j] = true;
+                    }
+                    else {
+                        break;
+                    }
+                }
+            }
+            for (int i = 0; i < N; i++) {
+                if (i % 2 == 0) {
+                    for (int j = 0; j < N; j++) {
+                        spiral.emplace_back(i, j);
+                    }
+                }
+                else {
+                    for (int j = N - 1; j >= 0; j--) {
+                        spiral.emplace_back(i, j);
+                    }
+                }
+            }
+
+            for (int c : perm) {
+                for (int i = 0; i < cnt[c]; i++) {
+                    target.push_back(c);
+                }
+            }
+
+            // 蛇腹状のパスに沿って揃えていく
+            // elems[idx] != target[idx] となるような idx に対して
+            // 既に揃えられたマス以外を通って数字 target[idx] を zigzag[idx] に移動させるような最短パスを求める
+            // 関数: ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
+            for (int idx = 0; idx < N * N; idx++) {
+                int i = spiral[idx].i, j = spiral[idx].j;
+                if (board[i][j] == target[idx]) {
+                    fixed[i][j] = true;
+                    continue;
+                }
+                auto path = get_shortest_path(target[idx], spiral[idx]);
+                do_moves(path);
                 fixed[i][j] = true;
-                continue;
             }
-            auto path = get_shortest_path(target[idx], zigzag[idx]);
-            do_moves(path);
-            fixed[i][j] = true;
+
         }
 
-    }
-
-    std::string str() const {
-        std::ostringstream oss;
-        oss << "--- State ---\n"
-            << "N = " << N << ", C = " << C << '\n';
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                oss << board[i][j] << ' ';
+        std::string str() const {
+            std::ostringstream oss;
+            oss << "--- State ---\n"
+                << "N = " << N << ", C = " << C << '\n';
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    oss << board[i][j] << ' ';
+                }
+                oss << '\n';
             }
-            oss << '\n';
+            oss << "-------------\n";
+            return oss.str();
         }
-        oss << "-------------\n";
-        return oss.str();
-    }
 
-    friend std::ostream& operator<<(std::ostream& o, const State& obj) {
-        o << obj.str();
-        return o;
-    }
-
-    void output(std::ostream& o) const {
-        o << moves.size() << '\n';
-        for (const auto& t : moves) {
-            int i1, j1, i2, j2;
-            std::tie(i1, j1, i2, j2) = t;
-            o << i1 << ' ' << j1 << ' ' << i2 << ' ' << j2 << '\n';
+        friend std::ostream& operator<<(std::ostream& o, const State& obj) {
+            o << obj.str();
+            return o;
         }
-    }
-};
+
+        void output(std::ostream& o) const {
+            o << moves.size() << '\n';
+            for (const auto& t : moves) {
+                int i1, j1, i2, j2;
+                std::tie(i1, j1, i2, j2) = t;
+                o << i1 << ' ' << j1 << ' ' << i2 << ' ' << j2 << '\n';
+            }
+        }
+    };
+}
+
+namespace NVariance {
+
+    struct State {
+        int N, C;
+        vector<int> cnt;
+        Board board;
+        vector<Move> moves;
+
+        State(std::istream& in) {
+            in >> N >> C;
+            board.resize(N, vector<int>(N));
+            in >> board;
+            cnt.resize(C, 0);
+            vector<double> imean(C, 0.0);
+            vector<double> jmean(C, 0.0);
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    cnt[board[i][j]]++;
+                    imean[board[i][j]] += i;
+                    jmean[board[i][j]] += j;
+                }
+            }
+
+            for (int c = 0; c < C; c++) {
+                imean[c] /= cnt[c];
+                jmean[c] /= cnt[c];
+            }
+
+            dump(C);
+            dump(imean);
+            dump(jmean);
+        }
+    };
+
+}
 
 //#define LOCAL_MODE
 
@@ -287,6 +351,8 @@ int main() {
     std::ostream& out = cout;
 #endif
 
+    using namespace NSpiral;
+
     State init_state(in);
 
     int best_score = INT_MAX;
@@ -296,7 +362,7 @@ int main() {
     for (int i = 0; i < init_state.C; i++) perm[i] = i;
 
     int loop = 0;
-    while (timer.elapsedMs() < 9500) {
+    while (true) {
         State state(init_state);
         state.solve(perm);
         if (state.moves.size() < best_score) {
@@ -306,6 +372,7 @@ int main() {
         }
         shuffle_vector(perm, rnd);
         loop++;
+        break; // only one iter
     }
     
     best_state.output(out);
