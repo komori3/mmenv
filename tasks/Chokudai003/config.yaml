@@ -4,7 +4,7 @@ name: 'Chokudai Contest 003'
 category: 'AtCoder Marathon'
 
 submissions_dir: ./data/submissions
-seed_file: ./data/seeds.txt
+seed_list: ./data/seeds.txt
 generator: ./src/build/generator
 judge: ./src/build/judge
 source: ./src/solvers/solver.cpp
