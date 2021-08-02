@@ -139,6 +139,7 @@ using Move = std::tuple<int, int, int, int>;
 struct State {
 
     int N, C;
+    vector<int> cnt;
     vector<vector<int>> board;
     vector<vector<bool>> fixed;
 
@@ -149,6 +150,13 @@ struct State {
         board.resize(N, vector<int>(N));
         in >> board;
         fixed.resize(N, vector<bool>(N, false));
+        cnt.resize(C, 0);
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                cnt[board[i][j]]++;
+            }
+        }
+        dump(cnt);
     }
 
     Path get_shortest_path(int x, const Point& dst) const {
@@ -194,7 +202,7 @@ struct State {
         }
     }
 
-    void solve() {
+    void solve(const vector<int>& perm) {
         // 蛇腹状のターゲットを作成
         vector<int> target;
         Path zigzag;
@@ -202,17 +210,20 @@ struct State {
             if (i % 2 == 0) {
                 for (int j = 0; j < N; j++) {
                     zigzag.emplace_back(i, j);
-                    target.push_back(board[i][j]);
                 }
             }
             else {
                 for (int j = N - 1; j >= 0; j--) {
                     zigzag.emplace_back(i, j);
-                    target.push_back(board[i][j]);
                 }
             }
         }
-        sort(target.begin(), target.end());
+
+        for (int c : perm) {
+            for (int i = 0; i < cnt[c]; i++) {
+                target.push_back(c);
+            }
+        }
 
         // 蛇腹状のパスに沿って揃えていく
         // elems[idx] != target[idx] となるような idx に対して
@@ -250,27 +261,57 @@ struct State {
         return o;
     }
 
+    void output(std::ostream& o) const {
+        o << moves.size() << '\n';
+        for (const auto& t : moves) {
+            int i1, j1, i2, j2;
+            std::tie(i1, j1, i2, j2) = t;
+            o << i1 << ' ' << j1 << ' ' << i2 << ' ' << j2 << '\n';
+        }
+    }
 };
+
+//#define LOCAL_MODE
 
 int main() {
     std::ios::sync_with_stdio(false);
     cin.tie(0);
 
-    //std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\1.in");
-    //std::istream& in = ifs;
+#ifdef LOCAL_MODE
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
+    std::istream& in = ifs;
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
+    std::ostream& out = ofs;
+#else
     std::istream& in = cin;
+    std::ostream& out = cout;
+#endif
 
-    State state(in);
+    State init_state(in);
 
-    state.solve();
+    int best_score = INT_MAX;
+    State best_state(init_state);
 
-    cout << state.moves.size() << '\n';
-    for (const auto& t : state.moves) {
-        int i1, j1, i2, j2;
-        std::tie(i1, j1, i2, j2) = t;
-        cout << i1 << ' ' << j1 << ' ' << i2 << ' ' << j2 << '\n';
+    vector<int> perm(init_state.C);
+    for (int i = 0; i < init_state.C; i++) perm[i] = i;
+
+    int loop = 0;
+    while (timer.elapsedMs() < 9500) {
+        State state(init_state);
+        state.solve(perm);
+        if (state.moves.size() < best_score) {
+            dump(state.moves.size());
+            best_score = state.moves.size();
+            best_state = state;
+        }
+        shuffle_vector(perm, rnd);
+        loop++;
     }
-    cout.flush();
+    
+    best_state.output(out);
+    out.flush();
+
+    dump(loop, timer.elapsedMs());
 
     return 0;
 }
