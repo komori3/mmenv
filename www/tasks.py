@@ -5,6 +5,7 @@ import os
 import json
 import yaml
 from yaml.loader import SafeLoader
+import subprocess
 
 from evaluator import extract_data, create_evaluator
 
@@ -100,7 +101,7 @@ def struct_submissions(submissions_dir: str, metric: str):
 
     evaluator = create_evaluator(metric)
     submissions = evaluator(extract_data(submissions_dir))
-    
+
     ncols = len(submissions) + 1
     header = ['seed']
 
@@ -151,6 +152,28 @@ def show_task(tag):
     return flask.render_template('task.html', title=tag, **context)
 
 
+def get_path(config_path, relpath):
+    return os.path.join(os.path.dirname(config_path), relpath)
+
+
+def run_applet(config_path, config, tag, sol, seed):
+
+    submissions_dir = get_path(config_path, config['submissions_dir'])
+    submission_dir = os.path.join(submissions_dir, sol)
+    output_dir = os.path.join(submission_dir, 'out')
+
+    tester_path = get_path(config_path, config['tester'])
+    tester_dir = os.path.dirname(tester_path)
+    tester_name = os.path.basename(tester_path)
+
+    os.chdir(tester_dir)
+
+    tester_cmd = ['java', '-jar', tester_name, '-no', '-sd', str(seed), '-lo', output_dir, '-ps', '-dl', '10']
+
+    print(' '.join(tester_cmd))
+    subprocess.run(tester_cmd)
+
+
 @app.route('/tasks/<tag>/<sol>/<seed>')
 def show_result(tag, sol, seed):
 
@@ -158,24 +181,31 @@ def show_result(tag, sol, seed):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=SafeLoader)
 
-    submissions_dir = get_path(config_path, config['submissions_dir'])
-    submission_dir = os.path.join(submissions_dir, sol)
-    input_file = os.path.join(submission_dir, 'in', f'{seed}.in')
-    output_file = os.path.join(submission_dir, 'out', f'{seed}.out')
+    if config['category'].lower() == 'topcoder marathon':
 
-    with open(input_file, 'r', encoding='utf-8') as f:
-        input_txt = str(f.read())
-    with open(output_file, 'r', encoding='utf-8') as f:
-        output_txt = str(f.read())
+        run_applet(config_path, config, tag, sol, seed)
 
-    context = {
-        'tag': tag,
-        'name': config['name'],
-        'sol': sol,
-        'seed': seed,
-        'input_txt': input_txt,
-        'output_txt': output_txt
-    }
+        return flask.render_template('vis/topcoder.html', title=tag)
 
-    print(tag, sol, seed)
-    return flask.render_template(f'vis/{tag}.html', title=tag, **context)
+    else:
+        
+        submissions_dir = get_path(config_path, config['submissions_dir'])
+        submission_dir = os.path.join(submissions_dir, sol)
+        input_file = os.path.join(submission_dir, 'in', f'{seed}.in')
+        output_file = os.path.join(submission_dir, 'out', f'{seed}.out')
+
+        with open(input_file, 'r', encoding='utf-8') as f:
+            input_txt = str(f.read())
+        with open(output_file, 'r', encoding='utf-8') as f:
+            output_txt = str(f.read())
+
+        context = {
+            'tag': tag,
+            'name': config['name'],
+            'sol': sol,
+            'seed': seed,
+            'input_txt': input_txt,
+            'output_txt': output_txt
+        }
+
+        return flask.render_template(f'vis/{tag}.html', title=tag, **context)
