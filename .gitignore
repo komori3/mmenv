@@ -6,3 +6,4 @@ venv-mm
 solver
 __pycache__
 *.jar
+tasks/*/tools
