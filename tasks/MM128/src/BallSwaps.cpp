@@ -122,11 +122,13 @@ struct Point {
     Point& operator-=(const Point& p) { i -= p.i; j -= p.j; return *this; }
     Point& operator-() { i = -i; j = -j; return *this; }
     bool operator<(const Point& p) { return i == p.i ? j < p.j : i < p.i; }
+    int distance(const Point& p) const { return abs(i - p.i) + abs(j - p.j); }
     std::string str() const { return "[" + std::to_string(i) + ", " + std::to_string(j) + ']'; }
     friend std::ostream& operator<<(std::ostream& o, const Point& p) { o << p.str(); return o; }
 };
 Point operator+(const Point& p1, const Point& p2) { return Point(p1) += p2; }
 Point operator-(const Point& p1, const Point& p2) { return Point(p1) -= p2; }
+int distance(const Point& p1, const Point& p2) { return p1.distance(p2); }
 
 constexpr Point dir[] = { {0,1},{-1,0},{0,-1},{1,0} };
 
@@ -138,6 +140,7 @@ struct State {
 
     int N, C;
     vector<vector<int>> board;
+    vector<vector<bool>> fixed;
 
     vector<Move> moves;
 
@@ -145,43 +148,87 @@ struct State {
         in >> N >> C;
         board.resize(N, vector<int>(N));
         in >> board;
+        fixed.resize(N, vector<bool>(N, false));
+    }
+
+    Path get_shortest_path(int x, const Point& dst) const {
+        //// dst に最も近い数字 x の場所を求めて、経路復元
+        //// 蛇腹なら線形でいける
+        int mindist = 1e9;
+        Point src;
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                if (fixed[i][j] || board[i][j] != x) continue;
+                int dist = Point(i, j).distance(dst);
+                if (dist < mindist) {
+                    mindist = dist;
+                    src = Point(i, j);
+                }
+            }
+        }
+
+        Path path({ src });
+        // j を解決してから、i を解決
+        while (src.j < dst.j) {
+            src.j++;
+            path.push_back(src);
+        }
+        while (src.j > dst.j) {
+            src.j--;
+            path.push_back(src);
+        }
+        while (src.i > dst.i) {
+            src.i--;
+            path.push_back(src);
+        }
+        assert(src.i >= dst.i);
+        return path;
+    }
+
+    void do_moves(const Path& path) {
+        for (int i = 0; i < (int)path.size() - 1; i++) {
+            const auto& p1 = path[i];
+            const auto& p2 = path[i + 1];
+            std::swap(board[p1.i][p1.j], board[p2.i][p2.j]);
+            moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
+        }
     }
 
     void solve() {
         // 蛇腹状のターゲットを作成
-        vector<int> elems;
+        vector<int> target;
         Path zigzag;
         for (int i = 0; i < N; i++) {
             if (i % 2 == 0) {
                 for (int j = 0; j < N; j++) {
                     zigzag.emplace_back(i, j);
-                    elems.push_back(board[i][j]);
+                    target.push_back(board[i][j]);
                 }
             }
             else {
                 for (int j = N - 1; j >= 0; j--) {
                     zigzag.emplace_back(i, j);
-                    elems.push_back(board[i][j]);
+                    target.push_back(board[i][j]);
                 }
             }
         }
-        // sort
-        int M = N * N;
-        for (int n = 0; n < M - 1; n++) {
-            // n 要素目に一番小さい値を移動する
-            int minval = elems[n], minidx = n;
-            for (int m = n + 1; m < M; m++) {
-                if (elems[m] < minval) {
-                    minval = elems[m];
-                    minidx = m;
-                }
+        sort(target.begin(), target.end());
+
+        // 蛇腹状のパスに沿って揃えていく
+        // elems[idx] != target[idx] となるような idx に対して
+        // 既に揃えられたマス以外を通って数字 target[idx] を zigzag[idx] に移動させるような最短パスを求める
+        // 関数: ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
+        for (int idx = 0; idx < N * N; idx++) {
+            int i = zigzag[idx].i, j = zigzag[idx].j;
+            if (board[i][j] == target[idx]) {
+                fixed[i][j] = true;
+                continue;
             }
-            // minidx -> n
-            for (int m = minidx - 1; m >= n; m--) {
-                std::swap(elems[m], elems[m + 1]);
-                moves.emplace_back(zigzag[m].i, zigzag[m].j, zigzag[m + 1].i, zigzag[m + 1].j);
-            }
+            auto path = get_shortest_path(target[idx], zigzag[idx]);
+            do_moves(path);
+            fixed[i][j] = true;
         }
+
     }
 
     std::string str() const {
@@ -209,6 +256,8 @@ int main() {
     std::ios::sync_with_stdio(false);
     cin.tie(0);
 
+    //std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\1.in");
+    //std::istream& in = ifs;
     std::istream& in = cin;
 
     State state(in);
