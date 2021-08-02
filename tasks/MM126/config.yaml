@@ -1,0 +1,11 @@
+id: 2
+tag: 'MM126'
+name: 'Marathon Match 126 - Slider'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: ./src/Slider.cpp
+metric: yours_div_max
+timelimit_ms: 10000

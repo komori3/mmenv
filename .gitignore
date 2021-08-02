@@ -5,3 +5,4 @@ tasks/*/src/build
 venv-mm
 solver
 __pycache__
+*.jar

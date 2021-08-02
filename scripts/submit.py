@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import subprocess
 from datetime import datetime
@@ -8,10 +9,6 @@ import json
 import yaml
 from yaml.loader import SafeLoader
 from multiprocessing import Pool
-
-
-def get_path(config_file_path, relpath):
-    return os.path.join(os.path.dirname(config_file_path), relpath)
 
 
 def failed_with_status(seed: int, status: str) -> dict:
@@ -62,6 +59,232 @@ def do_task(seed: int, generator_exec: str, solver_exec: str, judge_exec: str, i
 def do_task_wrapper(param): return do_task(*param)
 
 
+class TaskRunnerBase:
+
+    def get_path(self, relpath):
+        return os.path.join(os.path.dirname(self.config_path), relpath)
+
+    def __init__(self, args):
+
+        self.timestamp = datetime.now()
+
+        self.args = args
+
+        self.config_path = args.config
+        assert os.path.exists(
+            self.config_path), f'Config file {self.config_path} does not exist.'
+        self.config_path = os.path.abspath(self.config_path)
+
+        with open(self.config_path, 'r', encoding='utf-8') as f:
+            self.config = yaml.load(f, Loader=SafeLoader)
+
+        self.submissions_dir = os.path.abspath(self.get_path(
+            self.config['submissions_dir']) if args.test is None else 'example_test')
+
+        self.submission_dir = os.path.join(self.submissions_dir, args.tag)
+        assert not os.path.exists(
+            self.submission_dir), f'Submission directory {self.submission_dir} already exists.'
+
+        self.source_path = os.path.abspath(
+            self.get_path(self.config['source']))
+        assert os.path.exists(
+            self.source_path), f'Source file {self.source_path} does not exist.'
+
+        if args.vis:
+            assert args.test is not None, f'Visualize mode is only available if args.test is True.'
+
+
+class GeneralTaskRunner(TaskRunnerBase):
+
+    def __init__(self, args):
+        super().__init__(args)
+
+        self.seed_list_path = self.get_path(self.config['seed_list'])
+        assert os.path.exists(
+            self.seed_list_path), f'Seed list file {self.seed_list_path} does not exist.'
+
+        self.generator_path = self.get_path(self.config['generator'])
+        assert os.path.exists(
+            self.generator_path), f'Generator program {self.generator_path} does not exist.'
+
+        self.judge_path = self.get_path(self.config['judge'])
+        assert os.path.exists(
+            self.judge_path), f'Judge program {self.judge_path} does not exist.'
+
+    def build(self):
+
+        self.solver_path = './solver'  # tmp
+
+        build_cmd = ['g++-9', '-O2', '-Wall', '-Wextra',
+                     '-std=c++17', '-o', self.solver_path, self.source_path]
+
+        if self.args.vis:
+            build_cmd += [
+                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
+                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
+            ]
+
+        subprocess.run(build_cmd).check_returncode()
+
+    def do_tasks(self):
+
+        try:
+
+            input_dir = os.path.join(self.submission_dir, 'in')
+            output_dir = os.path.join(self.submission_dir, 'out')
+            error_dir = os.path.join(self.submission_dir, 'err')
+            os.makedirs(self.submission_dir)
+            os.makedirs(input_dir)
+            os.makedirs(output_dir)
+            os.makedirs(error_dir)
+            shutil.copy2(self.source_path, self.submission_dir)
+
+            with open(self.seed_list_path, 'r', encoding='utf-8') as f:
+                seeds = [int(seed) for seed in str(
+                    f.read()).split('\n') if seed != '']
+                if self.args.test is not None:
+                    num_seeds = len(seeds)
+                    seeds = seeds[:min(num_seeds, self.args.test)]
+
+            summary = {}
+            summary['submission_datetime'] = self.timestamp.strftime(
+                "%Y-%m-%d %H:%M:%S")
+            summary['tag'] = self.args.tag
+            summary['src'] = os.path.basename(self.source_path)
+
+            tasks = []
+            for seed in seeds:
+                tasks.append([seed, self.generator_path, self.solver_path, self.judge_path,
+                              input_dir, output_dir, error_dir, self.config['timelimit_ms']])
+
+            pool = Pool(self.args.njobs)
+            summary['results'] = pool.map(do_task_wrapper, tasks)
+
+            score = 0
+            for result in summary['results']:
+                score += result['score']
+
+            print(f'total score = {score}')
+            summary['score'] = score
+
+            summary_path = os.path.join(
+                self.submission_dir, 'summary.json')
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2)
+
+        except BaseException as e:
+
+            print(e)
+            sleep(1)
+            shutil.rmtree(self.submission_dir)
+            if self.args.test is not None:
+                shutil.rmtree(self.submissions_dir)
+            exit(1)
+
+        if self.args.test is not None:
+            shutil.rmtree(self.submissions_dir)
+
+
+class TCTaskRunner(TaskRunnerBase):
+
+    def __init__(self, args):
+        super().__init__(args)
+
+        self.seed_range = self.config[
+            'seed_range'] if self.args.test is None else f'1+{self.args.test}'
+
+        self.tester_path = self.get_path(self.config['tester'])
+
+    def build(self):
+
+        self.solver_path = os.path.abspath(os.path.join('solver'))  # tmp
+
+        self.build_cmd = ['g++-7', '-O3', '-Wall', '-Wextra',
+                          '-std=gnu++11', '-o', self.solver_path, self.source_path]
+
+        if self.args.vis:
+            self.build_cmd += [
+                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
+                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
+            ]
+
+        subprocess.run(self.build_cmd).check_returncode()
+
+    def parse_result(self, line):
+        result = {}
+        cols = line.split(',')
+        for col in cols:
+            key, val = tuple(map(str.strip, col.split('=')))
+            if key == 'Seed':
+                val = int(val)
+            elif key == 'Score':
+                val = float(val)
+            result[key.lower()] = val
+        result['status'] = 'WA' if result['score'] < - \
+            0.5 else 'AC'  # TODO: TLE
+        return result
+
+    def do_tasks(self):
+        # tester directory で tester を走らせないといけない
+
+        try:
+
+            self.input_dir = os.path.join(self.submission_dir, 'in')
+            self.output_dir = os.path.join(self.submission_dir, 'out')
+            self.error_dir = os.path.join(self.submission_dir, 'err')
+            os.makedirs(self.submission_dir)
+            shutil.copy2(self.source_path, self.submission_dir)
+
+            tester_dir = os.path.dirname(self.tester_path)
+            tester_name = os.path.basename(self.tester_path)
+
+            os.chdir(tester_dir)
+
+            options = ['-nv', '-no', '-pr', f'-si {self.input_dir}',
+                       f'-so {self.output_dir}', f'-se {self.error_dir}']
+            options.append(f'-th {self.args.njobs}')
+            options.append(f'-tl {self.config["timelimit_ms"]}')
+
+            tester_cmd = f'java -jar {tester_name} -ex {self.solver_path} -sd {self.seed_range} {" ".join(options)}'
+
+            proc = subprocess.Popen(
+                tester_cmd, shell=True, stdout=subprocess.PIPE)
+            results = []
+            while True:
+                line = proc.stdout.readline().decode()[:-1]
+                if len(line) > 0 and line[0] == 'S':
+                    result = self.parse_result(line)
+                    results.append(result)
+                sys.stdout.write(line + '\n')
+                if not line and proc.poll() is not None:
+                    break
+
+            results = sorted(results, key=lambda x: x['seed'])
+
+            summary = {}
+            summary['submission_datetime'] = self.timestamp.strftime(
+                "%Y-%m-%d %H:%M:%S")
+            summary['tag'] = self.args.tag
+            summary['src'] = os.path.basename(self.source_path)
+
+            summary['results'] = results
+
+            summary_path = os.path.join(self.submission_dir, 'summary.json')
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2)
+
+        except BaseException as e:
+
+            print(e)
+            sleep(1)
+            shutil.rmtree(self.submission_dir)
+            if self.args.test is not None:
+                shutil.rmtree(self.submissions_dir)
+
+        if self.args.test is not None:
+            shutil.rmtree(self.submissions_dir)
+
+
 if __name__ == "__main__":
     timestamp = datetime.now()
 
@@ -80,103 +303,28 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # set params
-    config_file = args.config
+    config_path = args.config
     assert os.path.exists(
-        config_file), f'Config file {config_file} does not exist.'
+        config_path), f'Config file {config_path} does not exist.'
+    config_path = os.path.abspath(config_path)
 
-    with open(config_file, 'r', encoding='utf-8') as f:
+    with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=SafeLoader)
 
-    submissions_dir = get_path(
-        config_file, config['submissions_dir']) if args.test is None else 'example_test'
-    submission_dir = os.path.join(submissions_dir, args.tag)
-    assert not os.path.exists(
-        submission_dir), f'Submission directory {submission_dir} already exists.'
+    topcoder_mode = config['category'].lower() == 'topcoder marathon'
 
-    seed_file = get_path(config_file, config['seed_file'])
-    assert os.path.exists(seed_file), f'Seed file {seed_file} does not exist.'
-
-    generator_exec = get_path(config_file, config['generator'])
-    assert os.path.exists(
-        generator_exec), f'Generator program {generator_exec} does not exist.'
-
-    judge_exec = get_path(config_file, config['judge'])
-    assert os.path.exists(
-        judge_exec), f'Judge program {judge_exec} does not exist.'
-
-    source_file = get_path(config_file, config['source'])
-    assert os.path.exists(
-        source_file), f'Source file {source_file} does not exist.'
-
-    if args.vis:
-        assert args.test is not None, f'Visualize mode is only available if args.test is True.'
-
-    # build
     try:
-        solver_exec = './solver'
-        build_cmd = ['g++', '-O2', '-Wall', '-Wextra',
-                     '-std=c++17', '-o', solver_exec, source_file]
-        if args.vis:
-            build_cmd += [
-                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
-                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
-            ]
-        subprocess.run(build_cmd).check_returncode()
+
+        if topcoder_mode:
+            task_runner = TCTaskRunner(args)
+        else:
+            task_runner = GeneralTaskRunner(args)
+        task_runner.build()
+        task_runner.do_tasks()
+
     except Exception as e:
+
         print(e)
         exit(1)
-
-    # do tasks
-    try:
-        input_dir = os.path.join(submission_dir, 'in')
-        output_dir = os.path.join(submission_dir, 'out')
-        error_dir = os.path.join(submission_dir, 'err')
-        os.makedirs(submission_dir)
-        os.makedirs(input_dir)
-        os.makedirs(output_dir)
-        os.makedirs(error_dir)
-        shutil.copy2(source_file, submission_dir)
-
-        with open(seed_file) as f:
-            seeds = [int(seed)
-                     for seed in str(f.read()).split('\n') if seed != '']
-            if args.test is not None:
-                num_seeds = len(seeds)
-                seeds = seeds[:min(num_seeds, args.test)]
-
-        summary = {}
-        summary['submission_datetime'] = timestamp.strftime(
-            "%Y-%m-%d %H:%M:%S")
-        summary['tag'] = args.tag
-
-        tasks = []
-        for seed in seeds:
-            tasks.append([seed, generator_exec, solver_exec, judge_exec,
-                         input_dir, output_dir, error_dir, config['timelimit_ms']])
-
-        pool = Pool(args.njobs)
-        summary['results'] = pool.map(do_task_wrapper, tasks)
-
-        score = 0
-        for result in summary['results']:
-            score += result['score']
-
-        print(f'total score = {score}')
-        summary['score'] = score
-
-        summary_file = os.path.join(submission_dir, 'summary.json')
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            json.dump(summary, f, indent=2)
-    except BaseException as e:
-        print(e)
-        sleep(1)
-        shutil.rmtree(submission_dir)
-        if args.test is not None:
-            shutil.rmtree(submissions_dir)
-        exit(1)
-
-    if args.test is not None:
-        shutil.rmtree(submissions_dir)
 
 # python scripts/submit.py --config tasks/Chokudai001/config.yaml --tag test_submit -j 10
