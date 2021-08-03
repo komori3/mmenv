@@ -6,6 +6,9 @@
 #include <unordered_set>
 #ifdef _MSC_VER
 #include <ppl.h>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #endif
 
 
@@ -111,6 +114,18 @@ void shuffle_vector(std::vector<T>& v, Xorshift& rnd) {
         std::swap(v[i], v[r]);
     }
 }
+/* fast queue */
+class FastQueue {
+    int front, back;
+    int v[1 << 12];
+public:
+    FastQueue() : front(0), back(0) {}
+    inline bool empty() { return front == back; }
+    inline void push(int x) { v[front++] = x; }
+    inline int pop() { return v[back++]; }
+    inline void reset() { front = back = 0; }
+    inline int size() { return front - back; }
+} fqu;
 
 //using namespace std;
 using std::vector; using std::string; using std::cerr; using std::cout; using std::cin; using std::endl; using std::shared_ptr;
@@ -133,40 +148,80 @@ Point operator-(const Point& p1, const Point& p2) { return Point(p1) -= p2; }
 int distance(const Point& p1, const Point& p2) { return p1.distance(p2); }
 
 constexpr Point dir[] = { {0,1},{1,0},{0,-1},{-1,0} };
+constexpr int di[] = { 0, 1, 0, -1 };
+constexpr int dj[] = { 1, 0, -1, 0 };
 
-using Path = std::vector<Point>;
-using Board = std::vector<std::vector<int>>;
+using Path = vector<Point>;
+using Board = vector<vector<int>>;
 using Move = std::tuple<int, int, int, int>;
 
 
-
+/* global */
 int N, C;
-vector<vector<int>> g_board;
+Board g_board;
+vector<int> g_count;
+unsigned int g_board_mask[32];
+#ifdef _MSC_VER
+const vector<cv::Scalar> g_color({
+    cv::Scalar(0, 0, 0),       // black (frame color)
+    cv::Scalar(255, 0, 0),     // blue
+    cv::Scalar(255, 0, 255),   // magenta
+    cv::Scalar(128, 128, 128), // gray
+    cv::Scalar(0, 0, 255),     // red
+    cv::Scalar(255, 255, 0),   // cyan
+    cv::Scalar(175, 175, 255), // pink
+    cv::Scalar(0, 255, 0),     // green
+    cv::Scalar(0, 200, 255)    // orange
+});
+#endif
 
 void init(std::istream& in) {
     in >> N >> C;
-    g_board.resize(N, vector<int>(N));
-    in >> g_board;
+    g_board.resize(N + 2, vector<int>(N + 2, 0)); // 1-indexed
+    for (int i = 1; i <= N; i++) {
+        for (int j = 1; j <= N; j++) {
+            in >> g_board[i][j];
+            g_board[i][j]++;
+        }
+    }
+    g_count.resize(C + 1, 0); // 1-indexed
+    for (int i = 0; i < N + 2; i++) {
+        for (int j = 0; j < N + 2; j++) {
+            g_count[g_board[i][j]]++;
+        }
+    }
+    for (const auto& v : g_board) cerr << v << endl;
+    cerr << g_count << endl;
+    unsigned int frame_mask = (1ULL << (N + 2)) - 1;
+    unsigned int inner_mask = (1ULL << (N + 1)) | 1;
+    g_board_mask[0] = g_board_mask[N + 1] = frame_mask;
+    for (int i = 1; i <= N; i++) g_board_mask[i] = inner_mask;
+    for (int i = 0; i < N + 2; i++) cerr << std::bitset<32>(g_board_mask[i]) << endl;
 }
 
 inline bool is_inside(const Point& p) {
-    return 0 <= p.i && p.i < N && 0 <= p.j && p.j < N;
+    return 1 <= p.i && p.i <= N && 1 <= p.j && p.j <= N;
 }
 
 Path generate_spiral(int N) {
     Path spiral;
-    vector<vector<bool>> visited(N, vector<bool>(N, false));
-    Point p(0, 0);
+    vector<vector<bool>> visited(N + 2, vector<bool>(N + 2, true));
+    for (int i = 1; i <= N; i++) {
+        for (int j = 1; j <= N; j++) {
+            visited[i][j] = false;
+        }
+    }
+    Point p(1, 1);
     int d = 0;
     spiral.push_back(p);
     visited[p.i][p.j] = true;
     while (true) {
-        if (is_inside(p + dir[d]) && !visited[p.i + dir[d].i][p.j + dir[d].j]) {
+        if (!visited[p.i + dir[d].i][p.j + dir[d].j]) {
             p += dir[d];
             spiral.push_back(p);
             visited[p.i][p.j] = true;
         }
-        else if (is_inside(p + dir[(d + 1) & 3]) && !visited[p.i + dir[(d + 1) & 3].i][p.j + dir[(d + 1) & 3].j]) {
+        else if (!visited[p.i + dir[(d + 1) & 3].i][p.j + dir[(d + 1) & 3].j]) {
             d = (d + 1) & 3;
             p += dir[d];
             spiral.push_back(p);
@@ -181,14 +236,14 @@ Path generate_spiral(int N) {
 
 Path generate_zigzag(int N) {
     Path zigzag;
-    for (int i = 0; i < N; i++) {
-        if (i % 2 == 0) {
-            for (int j = 0; j < N; j++) {
+    for (int i = 1; i <= N; i++) {
+        if (i % 2 == 1) {
+            for (int j = 1; j <= N; j++) {
                 zigzag.emplace_back(i, j);
             }
         }
         else {
-            for (int j = N - 1; j >= 0; j--) {
+            for (int j = N; j >= 1; j--) {
                 zigzag.emplace_back(i, j);
             }
         }
@@ -196,119 +251,203 @@ Path generate_zigzag(int N) {
     return zigzag;
 }
 
-struct State {
-    vector<int> cnt;
-    Board board;
-    vector<vector<bool>> fixed;
+namespace NRoute {
 
-    vector<Move> moves;
+    struct State {
+        Board S; // 初期盤面
+        Board T; // 最終盤面
+        Path route; // 移動する順番
+        vector<vector<bool>> fixed; // 移動終了したか？
 
-    State(const Board& board) : board(board) {
-        fixed.resize(N, vector<bool>(N, false));
-        cnt.resize(C, 0);
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                cnt[board[i][j]]++;
-            }
-        }
-    }
+        vector<Move> moves; // 移動履歴
 
-    Path get_shortest_path(int x, const Point& dst) const {
-        //// dst に最も近い数字 x の場所を求めて、経路復元
-        int mindist = 1e9;
-        Point src;
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                if (fixed[i][j] || board[i][j] != x) continue;
-                int dist = Point(i, j).distance(dst);
-                if (dist < mindist) {
-                    mindist = dist;
-                    src = Point(i, j);
+        State(const Board& T, const Path& route) 
+            : S(g_board), T(T), route(route), fixed(N + 2, vector<bool>(N + 2, false)) {
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    fixed[i][j] = false;
                 }
             }
         }
 
-        Path path({ src });
-            
-        while (src != dst) {
-            for (int d = 0; d < 4; d++) {
-                auto p = src + dir[d];
-                int dist = p.distance(dst);
-                if (is_inside(p) && !fixed[p.i][p.j] && dist < mindist) {
-                    src = p;
-                    path.push_back(p);
-                    mindist = dist;
-                    break;
+        Path get_shortest_path(int x, const Point& dst) const {
+            // ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
+            // dst に最も近い数字 x の場所を求めて、経路復元
+            int mindist = 1e9;
+            Point src;
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    if (fixed[i][j] || S[i][j] != x) continue;
+                    int dist = Point(i, j).distance(dst);
+                    if (dist < mindist) {
+                        mindist = dist;
+                        src = Point(i, j);
+                    }
                 }
             }
-        }
-        return path;
-    }
 
-    void do_moves(const Path& path) {
-        for (int i = 0; i < (int)path.size() - 1; i++) {
-            const auto& p1 = path[i];
-            const auto& p2 = path[i + 1];
-            std::swap(board[p1.i][p1.j], board[p2.i][p2.j]);
-            moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
-        }
-    }
+            Path path({ src });
 
-    void solve(const Path& route, const vector<int>& perm) {
-        // 螺旋状のターゲットを作成
-        vector<int> target;
-        for (int c : perm) {
-            for (int i = 0; i < cnt[c]; i++) {
-                target.push_back(c);
+            while (src != dst) {
+                for (int d = 0; d < 4; d++) {
+                    auto p = src + dir[d];
+                    int dist = p.distance(dst);
+                    if (!fixed[p.i][p.j] && dist < mindist) {
+                        src = p;
+                        path.push_back(p);
+                        mindist = dist;
+                        break;
+                    }
+                }
+            }
+            return path;
+        }
+
+        void do_moves(const Path& path) {
+            for (int i = 0; i < (int)path.size() - 1; i++) {
+                const auto& p1 = path[i];
+                const auto& p2 = path[i + 1];
+                std::swap(S[p1.i][p1.j], S[p2.i][p2.j]);
+                moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
             }
         }
 
-        // 蛇腹状のパスに沿って揃えていく
-        // elems[idx] != target[idx] となるような idx に対して
-        // 既に揃えられたマス以外を通って数字 target[idx] を zigzag[idx] に移動させるような最短パスを求める
-        // 関数: ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
-        for (int idx = 0; idx < N * N; idx++) {
-            int i = route[idx].i, j = route[idx].j;
-            if (board[i][j] == target[idx]) {
+        void solve() {
+            // route に沿って揃えていく
+            // 既に揃えられたマス以外を通って数字 T[i][j] を route[idx] に移動させるような最短パスを求める
+            for (int idx = 0; idx < N * N; idx++) {
+                int i = route[idx].i, j = route[idx].j;
+                if (S[i][j] == T[i][j]) {
+                    fixed[i][j] = true;
+                    continue;
+                }
+                auto path = get_shortest_path(T[i][j], route[idx]);
+                do_moves(path);
                 fixed[i][j] = true;
-                continue;
             }
-            auto path = get_shortest_path(target[idx], route[idx]);
-            do_moves(path);
-            fixed[i][j] = true;
         }
 
-    }
-
-    std::string str() const {
-        std::ostringstream oss;
-        oss << "--- State ---\n"
-            << "N = " << N << ", C = " << C << '\n';
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                oss << board[i][j] << ' ';
+        std::string str() const {
+            std::ostringstream oss;
+            oss << "--- State ---\n"
+                << "N = " << N << ", C = " << C << '\n';
+            for (int i = 0; i < N + 2; i++) {
+                for (int j = 0; j < N + 2; j++) {
+                    oss << S[i][j] << ' ';
+                }
+                oss << '\n';
             }
-            oss << '\n';
+            oss << "-------------\n";
+            return oss.str();
         }
-        oss << "-------------\n";
-        return oss.str();
-    }
 
-    friend std::ostream& operator<<(std::ostream& o, const State& obj) {
-        o << obj.str();
-        return o;
-    }
-
-    void output(std::ostream& o) const {
-        o << moves.size() << '\n';
-        for (const auto& t : moves) {
-            int i1, j1, i2, j2;
-            std::tie(i1, j1, i2, j2) = t;
-            o << i1 << ' ' << j1 << ' ' << i2 << ' ' << j2 << '\n';
+        friend std::ostream& operator<<(std::ostream& o, const State& obj) {
+            o << obj.str();
+            return o;
         }
-    }
-};
 
+        void output(std::ostream& o) const {
+            o << moves.size() << '\n';
+            for (const auto& t : moves) {
+                int i1, j1, i2, j2;
+                std::tie(i1, j1, i2, j2) = t;
+                o << i1 - 1 << ' ' << j1 - 1 << ' ' << i2 - 1 << ' ' << j2 - 1 << '\n';
+            }
+        }
+    };
+
+}
+
+namespace NStrictTransform {
+    // 初期盤面を S、最終盤面を T とすると問題は
+    // 1. valid な（かつ良型の） T を求めるフェーズ
+    // 2. S を T に変形するフェーズ
+    // の二段階に分けられる
+
+    // 1. はとりあえず求めるだけなら、蛇腹や螺旋の一本道に同じ色をまとめて突っ込んでいけば構築できる
+    // とりあえず求めた盤面を、制約を守りながら望ましい形に変化させていくアプローチを取る
+    // 盤面の良さは、暫定で S[i][j] == T[i][j] となるマスの個数とする
+    // -> 後で S をベースに blur を掛けたようなマップを生成して評価関数を滑らかにするのもありかも
+
+    struct State {
+        Board T;
+
+        State(const Board& T) : T(T) {}
+
+        int calc_score() const {
+            int score = 0;
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    score += T[i][j] == g_board[i][j];
+                }
+            }
+            return score;
+        }
+
+        bool is_valid() const {
+            // 各色 (0 除く) の連結成分数は 1
+            // 色 c のセル数は g_count[c] に一致
+            static unsigned int cmask;     // used color mask
+            static unsigned int bmask[32]; // used cell mask
+            // init
+            cmask = 0;
+            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
+
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    if ((bmask[i] >> j) & 1) continue; // used
+                    int c = T[i][j], cnt = 0;
+                    if ((cmask >> c) & 1) return false; // connected component > 1
+                    cmask |= (1U << c);
+                    // bfs
+                    fqu.reset();
+                    fqu.push((i << 5) | j);
+                    bmask[i] |= (1U << j);
+                    cnt++;
+                    while(!fqu.empty()) {
+                        int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
+                        for (int d = 0; d < 4; d++) {
+                            int ni = ci + di[d], nj = cj + dj[d];
+                            if (((bmask[ni] >> nj) & 1) || T[ni][nj] != c) continue;
+                            fqu.push((ni << 5) | nj);
+                            bmask[ni] |= (1U << nj);
+                            cnt++;
+                        }
+                    }
+                    if (cnt != g_count[c]) return false; // pixel count violation
+                }
+            }
+            return true;
+        }
+
+#ifdef _MSC_VER
+        void vis(int delay = 0) const {
+            int grid_size = 960 / (N + 2);
+            int height = grid_size * (N + 2), width = grid_size * (N + 2);
+            cv::Mat_<cv::Vec3b> img(height, width, cv::Vec3b(255, 255, 255));
+            for (int i = 0; i < N + 2; i++) {
+                for (int j = 0; j < N + 2; j++) {
+                    if (g_board[i][j] == T[i][j]) {
+                        cv::rectangle(img, cv::Rect(grid_size * j, grid_size * i, grid_size, grid_size), cv::Scalar(0, 255, 255), cv::FILLED);
+                    }
+                    if (g_board[i][j]) {
+                        cv::circle(img, cv::Point(grid_size * (j + 0.5), grid_size * (i + 0.5)), grid_size / 3, g_color[T[i][j]], cv::FILLED);
+                    }
+                    else {
+                        cv::rectangle(img, cv::Rect(grid_size * j, grid_size * i, grid_size, grid_size), cv::Scalar(0, 0, 0), cv::FILLED);
+                    }
+                }
+            }
+            for (int i = 1; i < N + 2; i++) {
+                cv::line(img, cv::Point(0, i * grid_size), cv::Point((N + 2) * grid_size, i * grid_size), cv::Scalar(0, 0, 0));
+                cv::line(img, cv::Point(i * grid_size, 0), cv::Point(i * grid_size, (N + 2) * grid_size), cv::Scalar(0, 0, 0));
+            }
+            cv::imshow("img", img);
+            cv::waitKey(delay);
+        }
+#endif
+    };
+}
 
 //#define LOCAL_MODE
 
@@ -328,36 +467,67 @@ int main() {
 
     init(in);
 
-    State init_state(g_board);
+    Board T;
 
-    int best_score = INT_MAX;
-    State best_state(init_state);
+    {
+        using namespace NStrictTransform;
 
-    vector<int> perm(C);
-    for (int i = 0; i < C; i++) perm[i] = i;
+        auto spiral = generate_spiral(N);
+        vector<int> color_list;
+        for (int c = 1; c <= C; c++) {
+            for (int i = 0; i < g_count[c]; i++) {
+                color_list.push_back(c);
+            }
+        }
+        Board target(N + 2, vector<int>(N + 2, 0));
+        for (int n = 0; n < N * N; n++) {
+            target[spiral[n].i][spiral[n].j] = color_list[n];
+        }
 
-    auto spiral = generate_spiral(N);
-    auto zigzag = generate_zigzag(N);
+        State state(target);
 
-    int loop = 0;
-    while (timer.elapsedMs() < 3000) {
-        for (const auto& route : { spiral, zigzag }) {
-            State state(init_state);
-            state.solve(route, perm);
-            if (state.moves.size() < best_score) {
-                best_score = state.moves.size();
-                best_state = state;
-                dump(best_score);
+        // random swap
+        int loop = 0, accepted = 0;
+        int score = state.calc_score();
+        while (timer.elapsedMs() < 5000) {
+            int i1 = rnd.next_int(N) + 1, j1 = rnd.next_int(N) + 1, i2, j2;
+            do {
+                i2 = rnd.next_int(N) + 1;
+                j2 = rnd.next_int(N) + 1;
+            } while ((i1 == i2 && j1 == j2) || state.T[i1][j1] == state.T[i2][j2]);
+            std::swap(state.T[i1][j1], state.T[i2][j2]);
+            if (!state.is_valid()) {
+                std::swap(state.T[i1][j1], state.T[i2][j2]);
+            }
+            else {
+                int new_score = state.calc_score();
+                if (new_score < score) {
+                    std::swap(state.T[i1][j1], state.T[i2][j2]);
+                }
+                else {
+                    accepted++;
+                    score = new_score;
+                }
             }
             loop++;
+            //if (!(loop & 65535)) {
+            //    dump(loop, accepted, score);
+            //    //state.vis(1);
+            //}
         }
-        shuffle_vector(perm, rnd);
-    }
-    
-    best_state.output(out);
-    out.flush();
+        dump(loop, accepted, score);
 
-    dump(best_score, loop, timer.elapsedMs());
+        T = state.T;
+    }
+
+    {
+        using namespace NRoute;
+        auto route = generate_spiral(N);
+        State state(T, route);
+        state.solve();
+        dump(state.moves.size());
+        state.output(out);
+    }
 
     return 0;
 }
