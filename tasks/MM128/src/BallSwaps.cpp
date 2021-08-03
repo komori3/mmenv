@@ -156,6 +156,7 @@ using Board = vector<vector<int>>;
 using Move = std::tuple<int, int, int, int>;
 
 
+
 /* global */
 int N, C;
 Board g_board;
@@ -172,7 +173,7 @@ const vector<cv::Scalar> g_color({
     cv::Scalar(175, 175, 255), // pink
     cv::Scalar(0, 255, 0),     // green
     cv::Scalar(0, 200, 255)    // orange
-});
+    });
 #endif
 
 void init(std::istream& in) {
@@ -190,13 +191,13 @@ void init(std::istream& in) {
             g_count[g_board[i][j]]++;
         }
     }
-    for (const auto& v : g_board) cerr << v << endl;
-    cerr << g_count << endl;
+    //for (const auto& v : g_board) cerr << v << endl;
+    //cerr << g_count << endl;
     unsigned int frame_mask = (1ULL << (N + 2)) - 1;
     unsigned int inner_mask = (1ULL << (N + 1)) | 1;
     g_board_mask[0] = g_board_mask[N + 1] = frame_mask;
     for (int i = 1; i <= N; i++) g_board_mask[i] = inner_mask;
-    for (int i = 0; i < N + 2; i++) cerr << std::bitset<32>(g_board_mask[i]) << endl;
+    //for (int i = 0; i < N + 2; i++) cerr << std::bitset<32>(g_board_mask[i]) << endl;
 }
 
 inline bool is_inside(const Point& p) {
@@ -261,7 +262,7 @@ namespace NRoute {
 
         vector<Move> moves; // 移動履歴
 
-        State(const Board& T, const Path& route) 
+        State(const Board& T, const Path& route)
             : S(g_board), T(T), route(route), fixed(N + 2, vector<bool>(N + 2, false)) {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
@@ -404,7 +405,7 @@ namespace NStrictTransform {
                     fqu.push((i << 5) | j);
                     bmask[i] |= (1U << j);
                     cnt++;
-                    while(!fqu.empty()) {
+                    while (!fqu.empty()) {
                         int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
                         for (int d = 0; d < 4; d++) {
                             int ni = ci + di[d], nj = cj + dj[d];
@@ -449,6 +450,300 @@ namespace NStrictTransform {
     };
 }
 
+namespace NFlow {
+
+    template<typename flow_t, typename cost_t>
+    struct PrimalDual {
+        const cost_t INF;
+
+        struct edge {
+            int to;
+            flow_t cap;
+            cost_t cost;
+            int rev;
+            bool isrev;
+            edge(int to = -1, flow_t cap = -1, cost_t cost = -1, int rev = -1, bool isrev = false)
+                : to(to), cap(cap), cost(cost), rev(rev), isrev(isrev) {}
+        };
+
+        vector<vector<edge>> graph;
+        vector<cost_t> potential, min_cost;
+        vector<int> prevv, preve;
+
+        PrimalDual(int V) : graph(V), INF(std::numeric_limits<cost_t>::max()) {}
+
+        void add_edge(int from, int to, flow_t cap, cost_t cost) {
+            graph[from].emplace_back(to, cap, cost, (int)graph[to].size(), false);
+            graph[to].emplace_back(from, 0, -cost, (int)graph[from].size() - 1, true);
+        }
+
+        cost_t min_cost_flow(int s, int t, flow_t f) {
+            int V = (int)graph.size();
+            cost_t ret = 0;
+            using Pi = std::pair<cost_t, int>;
+            std::priority_queue<Pi, vector<Pi>, std::greater<Pi>> que;
+            potential.assign(V, 0);
+            preve.assign(V, -1);
+            prevv.assign(V, -1);
+
+            while (f > 0) {
+                min_cost.assign(V, INF);
+                que.emplace(0, s);
+                min_cost[s] = 0;
+                while (!que.empty()) {
+                    Pi p = que.top();
+                    que.pop();
+                    if (min_cost[p.second] < p.first) continue;
+                    for (int i = 0; i < graph[p.second].size(); i++) {
+                        edge& e = graph[p.second][i];
+                        cost_t nextCost = min_cost[p.second] + e.cost + potential[p.second] - potential[e.to];
+                        if (e.cap > 0 && min_cost[e.to] > nextCost) {
+                            min_cost[e.to] = nextCost;
+                            prevv[e.to] = p.second, preve[e.to] = i;
+                            que.emplace(min_cost[e.to], e.to);
+                        }
+                    }
+                }
+                if (min_cost[t] == INF) return -1;
+                for (int v = 0; v < V; v++) potential[v] += min_cost[v];
+                flow_t addflow = f;
+                for (int v = t; v != s; v = prevv[v]) {
+                    addflow = std::min(addflow, graph[prevv[v]][preve[v]].cap);
+                }
+                f -= addflow;
+                ret += addflow * potential[t];
+                for (int v = t; v != s; v = prevv[v]) {
+                    edge& e = graph[prevv[v]][preve[v]];
+                    e.cap -= addflow;
+                    graph[v][e.rev].cap += addflow;
+                }
+            }
+            return ret;
+        }
+
+        void output() {
+            for (int i = 0; i < graph.size(); i++) {
+                for (auto& e : graph[i]) {
+                    if (e.isrev) continue;
+                    auto& rev_e = graph[e.to][e.rev];
+                    cout << i << "->" << e.to << " (flow: " << rev_e.cap << "/" << rev_e.cap + e.cap << ")" << endl;
+                }
+            }
+        }
+    };
+
+    struct Node {
+        int id, i, j;
+        Node(int id = -1, int i = -1, int j = -1) : id(id), i(i), j(j) {}
+        std::string str() const {
+            return format("Node [id=%d, p=(%d, %d)]", id, i, j);
+        }
+        friend std::ostream& operator<<(std::ostream& o, const Node& obj) {
+            o << obj.str();
+            return o;
+        }
+    };
+
+    using Assign = std::pair<Node, Node>;
+
+    struct Result {
+        int total_cost;
+        vector<vector<Assign>> color_to_assign;
+    };
+
+    vector<Assign> get_assign(
+        const vector<Node>& S, const vector<Node>& T, const PrimalDual<int, int>& pd) {
+        int ns = S.size();
+        vector<Assign> assign;
+        for (int u = 1; u <= S.size(); u++) {
+            for (const auto& e : pd.graph[u]) {
+                if (e.isrev) continue;
+                const auto& rev_e = pd.graph[e.to][e.rev];
+                if (!rev_e.cap) continue;
+                // i -> e.to
+                int v = e.to;
+                assign.emplace_back(S[u - 1], T[v - ns - 1]);
+            }
+        }
+        return assign;
+    }
+
+    Result calc_assign(const Path& route, const vector<int>& perm) {
+        Result result;
+        result.color_to_assign.resize(C + 1);
+        // create target board
+        Board target(N + 2, vector<int>(N + 2, 0));
+        vector<int> color_list;
+        for (int c : perm) {
+            for (int i = 0; i < g_count[c]; i++) {
+                color_list.push_back(c);
+            }
+        }
+        for (int n = 0; n < N * N; n++) {
+            target[route[n].i][route[n].j] = color_list[n];
+        }
+        // create nodes
+        vector<vector<Node>> S(C + 1), T(C + 1);
+        for (int i = 1; i <= N; i++) {
+            for (int j = 1; j <= N; j++) {
+                int sc = g_board[i][j];
+                S[sc].emplace_back(S[sc].size() + 1, i, j);
+            }
+        }
+        for (int i = 1; i <= N; i++) {
+            for (int j = 1; j <= N; j++) {
+                int tc = target[i][j];
+                T[tc].emplace_back(S[tc].size() + T[tc].size() + 1, i, j);
+            }
+        }
+        // mincostflow
+        int total_cost = 0;
+        for (int c = 1; c <= C; c++) {
+            int ns = S[c].size(), nt = T[c].size();
+            int V = ns + nt + 2;
+            PrimalDual<int, int> pd(V);
+            // u=0 から v in 1..s に容量 1, コスト 0 の辺を張る
+            for (const auto& v : S[c]) {
+                pd.add_edge(0, v.id, 1, 0);
+            }
+            // u in 1..s から v in s+1...s+t に容量 inf, コスト dist(u, v) の辺を張る
+            for (const auto& u : S[c]) {
+                for (const auto& v : T[c]) {
+                    int dist = abs(u.i - v.i) + abs(u.j - v.j);
+                    pd.add_edge(u.id, v.id, pd.INF, dist);
+                }
+            }
+            // u in s+1...s+t から v=s+t+1 に容量 1, コスト 0 の辺を張る
+            for (const auto& v : T[c]) {
+                pd.add_edge(v.id, V - 1, 1, 0);
+            }
+            double elapsed = timer.elapsedMs();
+            int cost = pd.min_cost_flow(0, V - 1, ns);
+            //dump(c, cost, V, timer.elapsedMs() - elapsed);
+            total_cost += cost;
+
+            result.color_to_assign[c] = get_assign(S[c], T[c], pd);
+        }
+        
+        result.total_cost = total_cost;
+
+        return result;
+    }
+
+}
+
+namespace NRoute2 {
+
+    struct Node;
+    using NodePtr = std::shared_ptr<Node>;
+    struct Node {
+        Point p; // 位置
+        NodePtr other;
+    };
+
+    struct State {
+        Board S; // 盤面
+        NFlow::Result assign; // 割当て
+        Path route; // 移動する順番
+        vector<vector<bool>> fixed; // 移動終了したか？
+
+        vector<Move> moves; // 移動履歴
+
+        State(const NFlow::Result& assign, const Path& route)
+            : S(g_board), assign(assign), route(route), fixed(N + 2, vector<bool>(N + 2, false)) {
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    fixed[i][j] = false;
+                }
+            }
+        }
+
+        void solve() {
+            // route に沿って揃えていく
+            vector<vector<NodePtr>> from_map(N + 2, vector<NodePtr>(N + 2, nullptr));
+            vector<vector<NodePtr>> to_map(N + 2, vector<NodePtr>(N + 2, nullptr));
+            for (int c = 1; c <= C; c++) {
+                for (const auto& n2n : assign.color_to_assign[c]) {
+                    const auto& from = n2n.first;
+                    const auto& to = n2n.second;
+                    NodePtr nfrom = std::make_shared<Node>();
+                    NodePtr nto = std::make_shared<Node>();
+                    nfrom->p = Point(from.i, from.j);
+                    nfrom->other = nto;
+                    nto->p = Point(to.i, to.j);
+                    nto->other = nfrom;
+                    from_map[nfrom->p.i][nfrom->p.j] = nfrom;
+                    to_map[nto->p.i][nto->p.j] = nto;
+                }
+            }
+            auto move_node = [&](NodePtr nto) {
+                // ノード nfrom をノード nto に移動させる最短パス　移動禁止領域: fixed
+                // 移動するたびにアップデートが必要なことに注意
+                // TODO: 移動のバリエーションを考慮
+                auto now_pos = nto->other->p;
+                auto dst_pos = nto->p;
+                int dist = now_pos.distance(dst_pos);
+                while (now_pos != dst_pos) {
+                    for (int d = 0; d < 4; d++) {
+                        auto next_pos = now_pos + dir[d];
+                        int ndist = next_pos.distance(dst_pos);
+                        if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
+                            // 採用: now_pos, next_pos を swap する
+                            // 点の swap
+                            std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
+                            // pointer の swap
+                            std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
+                            // 盤面の swap
+                            std::swap(S[now_pos.i][now_pos.j], S[next_pos.i][next_pos.j]);
+                            // !!!異なる色ならば!!!、moves に反映
+                            if (S[now_pos.i][now_pos.j] != S[next_pos.i][next_pos.j]) {
+                                moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
+                            }
+                            // assign
+                            now_pos = next_pos; dist = now_pos.distance(dst_pos);
+                        }
+                    }
+                }
+                // 到着したので fix
+                fixed[dst_pos.i][dst_pos.j] = true;
+            };
+            for (int idx = 0; idx < N * N; idx++) {
+                NodePtr nto = to_map[route[idx].i][route[idx].j];
+                move_node(nto);
+            }
+        }
+
+        std::string str() const {
+            std::ostringstream oss;
+            oss << "--- State ---\n"
+                << "N = " << N << ", C = " << C << '\n';
+            for (int i = 0; i < N + 2; i++) {
+                for (int j = 0; j < N + 2; j++) {
+                    oss << S[i][j] << ' ';
+                }
+                oss << '\n';
+            }
+            oss << "-------------\n";
+            return oss.str();
+        }
+
+        friend std::ostream& operator<<(std::ostream& o, const State& obj) {
+            o << obj.str();
+            return o;
+        }
+
+        void output(std::ostream& o) const {
+            o << moves.size() << '\n';
+            for (const auto& t : moves) {
+                int i1, j1, i2, j2;
+                std::tie(i1, j1, i2, j2) = t;
+                o << i1 - 1 << ' ' << j1 - 1 << ' ' << i2 - 1 << ' ' << j2 - 1 << '\n';
+            }
+        }
+    };
+
+}
+
 //#define LOCAL_MODE
 
 int main() {
@@ -456,9 +751,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\5.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\3.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\5.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\3.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -468,101 +763,37 @@ int main() {
     init(in);
 
     auto spiral = generate_spiral(N); // 移動は常に spiral
-    Board best_board;
-    int best_raw_score = INT_MAX;
-    {
-        using namespace NRoute;
-        auto zigzag = generate_zigzag(N); // 配置は zigzag も考慮
-        vector<int> perm;
-        for (int c = 1; c <= C; c++) perm.push_back(c);
-        vector<int> color_list;
-        for (int c : perm) {
-            for (int i = 0; i < g_count[c]; i++) {
-                color_list.push_back(c);
-            }
-        }
-        Board T1tmp(N + 2, vector<int>(N + 2, 0));
-        for (int n = 0; n < N * N; n++) {
-            T1tmp[spiral[n].i][spiral[n].j] = color_list[n];
-        }
+    vector<int> perm;
+    for (int c = 1; c <= C; c++) perm.push_back(c);
+    // 螺旋状に 11..22..33..CC を配置したときのコストを求めたい
+    double elapsed = timer.elapsedMs();
+    auto assign = NFlow::calc_assign(spiral, perm);
+    dump(assign.total_cost, timer.elapsedMs() - elapsed);
 
-        int loop = 0;
-        while (timer.elapsedMs() < 2000) {
-            for (const auto& route : { zigzag, spiral }) {
-                int n = 0;
-                for (int c : perm) {
-                    for (int i = 0; i < g_count[c]; i++) {
-                        color_list[n++] = c;
-                    }
-                }
-                for (int n = 0; n < N * N; n++) {
-                    T1tmp[route[n].i][route[n].j] = color_list[n];
-                }
-                State state(T1tmp, spiral);
-                state.solve();
-                if (state.moves.size() < best_raw_score) {
-                    best_board = state.T;
-                    best_raw_score = state.moves.size();
-                    dump(best_raw_score);
-                }
-                loop++;
-            }
-            shuffle_vector(perm, rnd);
-        }
-        dump(best_raw_score, loop);
-    }
-
-    Board T;
-    {
-        using namespace NStrictTransform;
-
-        State state(best_board);
-
-        // random swap
-        int loop = 0, accepted = 0;
-        int score = state.calc_score();
-        while (timer.elapsedMs() < 5000) {
-            int i1 = rnd.next_int(N) + 1, j1 = rnd.next_int(N) + 1, i2, j2;
-            do {
-                i2 = rnd.next_int(N) + 1;
-                j2 = rnd.next_int(N) + 1;
-            } while ((i1 == i2 && j1 == j2) || state.T[i1][j1] == state.T[i2][j2]);
-            std::swap(state.T[i1][j1], state.T[i2][j2]);
-            if (!state.is_valid()) {
-                std::swap(state.T[i1][j1], state.T[i2][j2]);
-            }
-            else {
-                int new_score = state.calc_score();
-                if (new_score < score) {
-                    std::swap(state.T[i1][j1], state.T[i2][j2]);
-                }
-                else {
-                    accepted++;
-                    score = new_score;
-                }
-            }
-            loop++;
-            if (!(loop & 8191)) {
-                NRoute::State rstate(state.T, spiral);
-                rstate.solve();
-                //dump(loop, accepted, score, rstate.moves.size());
-                if (rstate.moves.size() < best_raw_score) {
-                    best_board = rstate.T;
-                    best_raw_score = rstate.moves.size();
-                    dump(best_raw_score);
-                }
-                //state.vis(1);
-            }
+    // 順列変更山登り
+    auto best_assign(assign);
+    vector<int> best_perm = perm;
+    while (timer.elapsedMs() < 5000) {
+        int i = rnd.next_int(C), j;
+        do {
+            j = rnd.next_int(C);
+        } while (i == j);
+        std::swap(perm[i], perm[j]);
+        //shuffle_vector(perm, rnd);
+        assign = NFlow::calc_assign(spiral, perm);
+        if (assign.total_cost < best_assign.total_cost) {
+            best_assign = assign;
+            best_perm = perm;
+            dump(best_assign.total_cost, timer.elapsedMs());
         }
     }
 
-    {
-        using namespace NRoute;
-        State state(best_board, spiral);
-        state.solve();
-        dump(state.moves.size());
-        state.output(out);
-    }
+    NRoute2::State state(best_assign, spiral);
+    state.solve();
+
+    dump(state.moves.size());
+
+    state.output(out);
 
     return 0;
 }
