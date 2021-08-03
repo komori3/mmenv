@@ -470,7 +470,7 @@ namespace NFlow {
         vector<cost_t> potential, min_cost;
         vector<int> prevv, preve;
 
-        PrimalDual(int V) : graph(V), INF(std::numeric_limits<cost_t>::max()) {}
+        PrimalDual(int V) : INF(std::numeric_limits<cost_t>::max()), graph(V) {}
 
         void add_edge(int from, int to, flow_t cap, cost_t cost) {
             graph[from].emplace_back(to, cap, cost, (int)graph[to].size(), false);
@@ -494,7 +494,7 @@ namespace NFlow {
                     Pi p = que.top();
                     que.pop();
                     if (min_cost[p.second] < p.first) continue;
-                    for (int i = 0; i < graph[p.second].size(); i++) {
+                    for (int i = 0; i < (int)graph[p.second].size(); i++) {
                         edge& e = graph[p.second][i];
                         cost_t nextCost = min_cost[p.second] + e.cost + potential[p.second] - potential[e.to];
                         if (e.cap > 0 && min_cost[e.to] > nextCost) {
@@ -555,7 +555,7 @@ namespace NFlow {
         const vector<Node>& S, const vector<Node>& T, const PrimalDual<int, int>& pd) {
         int ns = S.size();
         vector<Assign> assign;
-        for (int u = 1; u <= S.size(); u++) {
+        for (int u = 1; u <= (int)S.size(); u++) {
             for (const auto& e : pd.graph[u]) {
                 if (e.isrev) continue;
                 const auto& rev_e = pd.graph[e.to][e.rev];
@@ -617,7 +617,7 @@ namespace NFlow {
             for (const auto& v : T[c]) {
                 pd.add_edge(v.id, V - 1, 1, 0);
             }
-            double elapsed = timer.elapsedMs();
+            //double elapsed = timer.elapsedMs();
             int cost = pd.min_cost_flow(0, V - 1, ns);
             //dump(c, cost, V, timer.elapsedMs() - elapsed);
             total_cost += cost;
@@ -684,9 +684,23 @@ namespace NRoute2 {
                 auto dst_pos = nto->p;
                 int dist = now_pos.distance(dst_pos);
                 while (now_pos != dst_pos) {
+                    int d_primary = -1, d_secondary = -1;
                     for (int d = 0; d < 4; d++) {
                         auto next_pos = now_pos + dir[d];
                         int ndist = next_pos.distance(dst_pos);
+                        if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
+                            if(d_secondary == -1) d_secondary = d;
+                            if (S[now_pos.i][now_pos.j] == S[next_pos.i][next_pos.j]) {
+                                if (d_primary == -1) d_primary = d;
+                            }
+                        }
+                    }
+                    int d = (d_primary != -1) ? d_primary : d_secondary;
+                    //for (int d = 0; d < 4; d++) {
+                        auto next_pos = now_pos + dir[d];
+                        int ndist = next_pos.distance(dst_pos);
+                        // 同じ色の移動を優先処理したい
+                        
                         if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
                             // 採用: now_pos, next_pos を swap する
                             // 点の swap
@@ -702,7 +716,7 @@ namespace NRoute2 {
                             // assign
                             now_pos = next_pos; dist = now_pos.distance(dst_pos);
                         }
-                    }
+                    //}
                 }
                 // 到着したので fix
                 fixed[dst_pos.i][dst_pos.j] = true;
@@ -779,7 +793,6 @@ int main() {
             j = rnd.next_int(C);
         } while (i == j);
         std::swap(perm[i], perm[j]);
-        //shuffle_vector(perm, rnd);
         assign = NFlow::calc_assign(spiral, perm);
         if (assign.total_cost < best_assign.total_cost) {
             best_assign = assign;
