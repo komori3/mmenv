@@ -191,13 +191,10 @@ void init(std::istream& in) {
             g_count[g_board[i][j]]++;
         }
     }
-    //for (const auto& v : g_board) cerr << v << endl;
-    //cerr << g_count << endl;
     unsigned int frame_mask = (1ULL << (N + 2)) - 1;
     unsigned int inner_mask = (1ULL << (N + 1)) | 1;
     g_board_mask[0] = g_board_mask[N + 1] = frame_mask;
     for (int i = 1; i <= N; i++) g_board_mask[i] = inner_mask;
-    //for (int i = 0; i < N + 2; i++) cerr << std::bitset<32>(g_board_mask[i]) << endl;
 }
 
 inline bool is_inside(const Point& p) {
@@ -250,113 +247,6 @@ Path generate_zigzag(int N) {
         }
     }
     return zigzag;
-}
-
-namespace NRoute {
-
-    struct State {
-        Board S; // 初期盤面
-        Board T; // 最終盤面
-        Path route; // 移動する順番
-        vector<vector<bool>> fixed; // 移動終了したか？
-
-        vector<Move> moves; // 移動履歴
-
-        State(const Board& T, const Path& route)
-            : S(g_board), T(T), route(route), fixed(N + 2, vector<bool>(N + 2, false)) {
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    fixed[i][j] = false;
-                }
-            }
-        }
-
-        Path get_shortest_path(int x, const Point& dst) const {
-            // ある数字 x をセル c に移動させる最短パス　移動禁止領域: fixed
-            // dst に最も近い数字 x の場所を求めて、経路復元
-            int mindist = 1e9;
-            Point src;
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    if (fixed[i][j] || S[i][j] != x) continue;
-                    int dist = Point(i, j).distance(dst);
-                    if (dist < mindist) {
-                        mindist = dist;
-                        src = Point(i, j);
-                    }
-                }
-            }
-
-            Path path({ src });
-
-            while (src != dst) {
-                for (int d = 0; d < 4; d++) {
-                    auto p = src + dir[d];
-                    int dist = p.distance(dst);
-                    if (!fixed[p.i][p.j] && dist < mindist) {
-                        src = p;
-                        path.push_back(p);
-                        mindist = dist;
-                        break;
-                    }
-                }
-            }
-            return path;
-        }
-
-        void do_moves(const Path& path) {
-            for (int i = 0; i < (int)path.size() - 1; i++) {
-                const auto& p1 = path[i];
-                const auto& p2 = path[i + 1];
-                std::swap(S[p1.i][p1.j], S[p2.i][p2.j]);
-                moves.emplace_back(p1.i, p1.j, p2.i, p2.j);
-            }
-        }
-
-        void solve() {
-            // route に沿って揃えていく
-            // 既に揃えられたマス以外を通って数字 T[i][j] を route[idx] に移動させるような最短パスを求める
-            for (int idx = 0; idx < N * N; idx++) {
-                int i = route[idx].i, j = route[idx].j;
-                if (S[i][j] == T[i][j]) {
-                    fixed[i][j] = true;
-                    continue;
-                }
-                auto path = get_shortest_path(T[i][j], route[idx]);
-                do_moves(path);
-                fixed[i][j] = true;
-            }
-        }
-
-        std::string str() const {
-            std::ostringstream oss;
-            oss << "--- State ---\n"
-                << "N = " << N << ", C = " << C << '\n';
-            for (int i = 0; i < N + 2; i++) {
-                for (int j = 0; j < N + 2; j++) {
-                    oss << S[i][j] << ' ';
-                }
-                oss << '\n';
-            }
-            oss << "-------------\n";
-            return oss.str();
-        }
-
-        friend std::ostream& operator<<(std::ostream& o, const State& obj) {
-            o << obj.str();
-            return o;
-        }
-
-        void output(std::ostream& o) const {
-            o << moves.size() << '\n';
-            for (const auto& t : moves) {
-                int i1, j1, i2, j2;
-                std::tie(i1, j1, i2, j2) = t;
-                o << i1 - 1 << ' ' << j1 - 1 << ' ' << i2 - 1 << ' ' << j2 - 1 << '\n';
-            }
-        }
-    };
-
 }
 
 namespace NStrictTransform {
@@ -632,100 +522,123 @@ namespace NFlow {
 
 }
 
-namespace NRoute2 {
+namespace NRoute {
 
     struct Node;
     using NodePtr = std::shared_ptr<Node>;
     struct Node {
         Point p; // 位置
+        int c;   // 色
         NodePtr other;
     };
 
     struct State {
-        Board S; // 盤面
         NFlow::Result assign; // 割当て
         Path route; // 移動する順番
         vector<vector<bool>> fixed; // 移動終了したか？
 
+        vector<vector<NodePtr>> from_map; // 目的地情報付き盤面
+        vector<vector<NodePtr>> to_map;   // 現在地情報付きターゲット
+
         vector<Move> moves; // 移動履歴
 
-        State(const NFlow::Result& assign, const Path& route)
-            : S(g_board), assign(assign), route(route), fixed(N + 2, vector<bool>(N + 2, false)) {
+        State(const NFlow::Result& assign, const Path& route) :
+            assign(assign), route(route),
+            fixed(N + 2, vector<bool>(N + 2, false)),
+            from_map(N + 2, vector<NodePtr>(N + 2, nullptr)),
+            to_map(N + 2, vector<NodePtr>(N + 2, nullptr))
+        {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
                     fixed[i][j] = false;
                 }
             }
-        }
-
-        void solve() {
-            // route に沿って揃えていく
-            vector<vector<NodePtr>> from_map(N + 2, vector<NodePtr>(N + 2, nullptr));
-            vector<vector<NodePtr>> to_map(N + 2, vector<NodePtr>(N + 2, nullptr));
+            int id = 0;
             for (int c = 1; c <= C; c++) {
                 for (const auto& n2n : assign.color_to_assign[c]) {
                     const auto& from = n2n.first;
                     const auto& to = n2n.second;
                     NodePtr nfrom = std::make_shared<Node>();
                     NodePtr nto = std::make_shared<Node>();
+                    int c = g_board[from.i][from.j];
                     nfrom->p = Point(from.i, from.j);
+                    nfrom->c = c;
                     nfrom->other = nto;
                     nto->p = Point(to.i, to.j);
+                    nto->c = c;
                     nto->other = nfrom;
                     from_map[nfrom->p.i][nfrom->p.j] = nfrom;
                     to_map[nto->p.i][nto->p.j] = nto;
                 }
             }
-            auto move_node = [&](NodePtr nto) {
-                // ノード nfrom をノード nto に移動させる最短パス　移動禁止領域: fixed
-                // 移動するたびにアップデートが必要なことに注意
-                // TODO: 移動のバリエーションを考慮
-                auto now_pos = nto->other->p;
-                auto dst_pos = nto->p;
-                int dist = now_pos.distance(dst_pos);
-                while (now_pos != dst_pos) {
-                    // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
-                    // TODO: dist を減らさなくても total_cost が 2 減るような移動を優先する？
-                    int min_cost_diff = 1000, min_cost_dir = -1;
-                    for (int d = 0; d < 4; d++) {
-                        auto next_pos = now_pos + dir[d];
-                        int ndist = next_pos.distance(dst_pos);
-                        if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                            // 大前提として、着目しているマスの到達距離は減る
-                            // next_pos -> now_pos の移動が到達距離を縮めるか？
-                            NodePtr from = from_map[next_pos.i][next_pos.j];
-                            NodePtr to = from->other;
-                            int dist2 = from->p.distance(to->p);
-                            int ndist2 = now_pos.distance(to->p);
-                            int diff = ndist2 - dist2 + ndist - dist;
-                            if (diff < min_cost_diff) {
-                                min_cost_diff = diff;
-                                min_cost_dir = d;
-                            }
-                        }
-                    }
-                    int d = min_cost_dir;
+        }
+
+        void move_node(NodePtr nto) {
+            // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
+            // 必ずしもこの時点での nfrom を nto に移動させる必要はない？
+            // pointer をすげ替えてコストが減るなら変更すべき？
+            // TODO: 移動のバリエーションを考慮　極小dfs とか？
+            auto now_pos = nto->other->p;
+            auto dst_pos = nto->p;
+            int dist = now_pos.distance(dst_pos);
+            // TODO: 無駄な動きがいくつか見られる: seed 17 とか？
+            while (now_pos != dst_pos) {
+                // nto の色が既に揃っている場合
+                if (from_map[dst_pos.i][dst_pos.j]->c == nto->c) {
+                    // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
+                    auto p1 = nto->p;
+                    auto p2 = from_map[dst_pos.i][dst_pos.j]->other->p;
+                    // TODO: なんかもっといい方法がある気がする…
+                    std::swap(to_map[p1.i][p1.j]->p, to_map[p2.i][p2.j]->p);
+                    std::swap(to_map[p1.i][p1.j]->c, to_map[p2.i][p2.j]->c);
+                    std::swap(to_map[p1.i][p1.j], to_map[p2.i][p2.j]);
+                    fixed[dst_pos.i][dst_pos.j] = true;
+                    return;
+                }
+                // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
+                // TODO: dist を減らさなくても total_cost が 2 減るような移動を優先する？無限ループしそうではある
+                int min_cost_diff = 1000, min_cost_dir = -1;
+                for (int d = 0; d < 4; d++) {
                     auto next_pos = now_pos + dir[d];
                     int ndist = next_pos.distance(dst_pos);
                     if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                        // 採用: now_pos, next_pos を swap する
-                        // 点の swap
-                        std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
-                        // pointer の swap
-                        std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
-                        // 盤面の swap
-                        std::swap(S[now_pos.i][now_pos.j], S[next_pos.i][next_pos.j]);
-                        // !!!異なる色ならば!!!、moves に反映
-                        if (S[now_pos.i][now_pos.j] != S[next_pos.i][next_pos.j]) {
-                            moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
+                        // 大前提として、着目しているマスの到達距離は減る
+                        // next_pos -> now_pos の移動が到達距離を縮めるか？
+                        NodePtr from = from_map[next_pos.i][next_pos.j];
+                        NodePtr to = from->other;
+                        int dist2 = from->p.distance(to->p);
+                        int ndist2 = now_pos.distance(to->p);
+                        int diff = ndist2 - dist2 + ndist - dist;
+                        if (diff < min_cost_diff) {
+                            min_cost_diff = diff;
+                            min_cost_dir = d;
                         }
-                        // assign
-                        now_pos = next_pos; dist = now_pos.distance(dst_pos);
                     }
                 }
-                // 到着したので fix
-                fixed[dst_pos.i][dst_pos.j] = true;
-            };
+                int d = min_cost_dir;
+                auto next_pos = now_pos + dir[d];
+                int ndist = next_pos.distance(dst_pos);
+                if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
+                    // 採用: now_pos, next_pos を swap する
+                    // 点の swap
+                    std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
+                    // pointer の swap
+                    std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
+                    // !!!異なる色ならば!!!、moves に反映
+                    if (from_map[now_pos.i][now_pos.j]->c != from_map[next_pos.i][next_pos.j]->c) {
+                        moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
+                    }
+                    // assign
+                    now_pos = next_pos; dist = now_pos.distance(dst_pos);
+                }
+                //vis();
+            }
+            // 到着したので fix
+            fixed[dst_pos.i][dst_pos.j] = true;
+        }
+
+        void solve() {
+            // route に沿って揃えていく
             for (int idx = 0; idx < N * N; idx++) {
                 NodePtr nto = to_map[route[idx].i][route[idx].j];
                 move_node(nto);
@@ -738,7 +651,7 @@ namespace NRoute2 {
                 << "N = " << N << ", C = " << C << '\n';
             for (int i = 0; i < N + 2; i++) {
                 for (int j = 0; j < N + 2; j++) {
-                    oss << S[i][j] << ' ';
+                    oss << from_map[i][j]->c << ' ';
                 }
                 oss << '\n';
             }
@@ -759,6 +672,56 @@ namespace NRoute2 {
                 o << i1 - 1 << ' ' << j1 - 1 << ' ' << i2 - 1 << ' ' << j2 - 1 << '\n';
             }
         }
+
+#ifdef _MSC_VER
+        void vis(int delay = 0) {
+            int grid_size = 960 / (N + 2);
+            int height = grid_size * (N + 2), width = grid_size * (N + 2);
+            cv::Mat_<cv::Vec3b> img(height, width, cv::Vec3b(255, 255, 255));
+            // to_map
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    cv::Rect roi(grid_size * j, grid_size * i, grid_size, grid_size);
+                    cv::rectangle(img, roi, g_color[to_map[i][j]->c], cv::FILLED);
+                }
+            }
+            // grid line
+            for (int i = 1; i < N + 2; i++) {
+                cv::line(img, cv::Point(0, i * grid_size), cv::Point((N + 2) * grid_size, i * grid_size), cv::Scalar(0, 0, 0), 1);
+                cv::line(img, cv::Point(i * grid_size, 0), cv::Point(i * grid_size, (N + 2) * grid_size), cv::Scalar(0, 0, 0), 1);
+            }
+            // from_map
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    cv::Point p(grid_size * (j + 0.5), grid_size * (i + 0.5));
+                    cv::circle(img, p, grid_size / 3, g_color[from_map[i][j]->c], cv::FILLED);
+                    auto color = (from_map[i][j]->p == from_map[i][j]->other->p) ? cv::Scalar(0, 255, 255) : cv::Scalar(50, 50, 50);
+                    cv::circle(img, p, grid_size / 3, color, 1);
+                }
+            }
+            // prev_move
+            if (!moves.empty()) {
+                int i1, j1, i2, j2; std::tie(i1, j1, i2, j2) = moves.back();
+                cv::Rect roi1(grid_size * j1, grid_size * i1, grid_size, grid_size);
+                cv::Rect roi2(grid_size * j2, grid_size * i2, grid_size, grid_size);
+                cv::rectangle(img, roi1, cv::Scalar(0, 255, 255), 3);
+                cv::rectangle(img, roi2, cv::Scalar(0, 255, 255), 3);
+            }
+            // arrow
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    auto pf = from_map[i][j]->p;
+                    cv::Point cvpf(grid_size * (pf.j + 0.5), grid_size * (pf.i + 0.5));
+                    auto pt = from_map[i][j]->other->p;
+                    cv::Point cvpt(grid_size * (pt.j + 0.5), grid_size * (pt.i + 0.5));
+                    cv::arrowedLine(img, cvpf, cvpt, cv::Scalar(0, 255, 255), 1, 8, 0, 0.1);
+                }
+            }
+            cv::imshow("img", img);
+            cv::waitKey(delay);
+        }
+#endif
+
     };
 
 }
@@ -806,7 +769,10 @@ int main() {
         }
     }
 
-    NRoute2::State state(best_assign, spiral);
+    NRoute::State state(best_assign, spiral);
+
+    //state.vis();
+
     state.solve();
 
     dump(state.moves.size());
