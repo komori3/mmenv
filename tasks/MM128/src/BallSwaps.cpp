@@ -530,6 +530,35 @@ namespace NRoute {
         Point p; // 位置
         int c;   // 色
         NodePtr other;
+
+        std::string str() const {
+            return format("Node [this=%p, p=%s, c=%d, other=%p, other->p=%s, other->c=%d]",
+                this, p.str().c_str(), c, other.get(), other->p.str().c_str(), other->c);
+        }
+        friend std::ostream& operator<<(std::ostream& o, const Node& obj) {
+            o << obj.str();
+            return o;
+        }
+        friend std::ostream& operator<<(std::ostream& o, const NodePtr& obj) {
+            o << obj->str();
+            return o;
+        }
+    };
+
+    struct Trans {
+        enum struct Type { BOARD, TARGET };
+        Type type;
+        int i1, j1, i2, j2;
+        int diff;
+        bool is_valid;
+
+        std::string str() const {
+            return format("Trans [type=%d, i1=%d, j1=%d, i2=%d, j2=%d, diff=%d, is_valid=%d]", type, i1, j1, i2, j2, diff, is_valid);
+        }
+        friend std::ostream& operator<<(std::ostream& o, const Trans& obj) {
+            o << obj.str();
+            return o;
+        }
     };
 
     struct State {
@@ -537,23 +566,34 @@ namespace NRoute {
         Path route; // 移動する順番
         vector<vector<bool>> fixed; // 移動終了したか？
 
-        vector<vector<NodePtr>> from_map; // 目的地情報付き盤面
-        vector<vector<NodePtr>> to_map;   // 現在地情報付きターゲット
+        vector<vector<NodePtr>> board; // 目的地情報付き現在地
+        vector<vector<NodePtr>> target;   // 現在地情報付き目的地
 
         vector<Move> moves; // 移動履歴
+        int total_distance;
+
+        // 2 つの遷移を考える
+
+        // 1. 4-adjacent な 2 点の現在地を入れ替える
+        // -> move に対応　移動コストが 1 増える
+
+        // 2. 任意の 2 点の目的地を入れ替える
+        // -> 完成盤面をいじる操作
+        // -> 移動コストが生じない（!）
+        // -> 連結成分条件を保つ必要がある
 
         State(const NFlow::Result& assign, const Path& route) :
             assign(assign), route(route),
-            fixed(N + 2, vector<bool>(N + 2, false)),
-            from_map(N + 2, vector<NodePtr>(N + 2, nullptr)),
-            to_map(N + 2, vector<NodePtr>(N + 2, nullptr))
+            fixed(N + 2, vector<bool>(N + 2, true)),
+            board(N + 2, vector<NodePtr>(N + 2, nullptr)),
+            target(N + 2, vector<NodePtr>(N + 2, nullptr)),
+            total_distance(assign.total_cost)
         {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
                     fixed[i][j] = false;
                 }
             }
-            int id = 0;
             for (int c = 1; c <= C; c++) {
                 for (const auto& n2n : assign.color_to_assign[c]) {
                     const auto& from = n2n.first;
@@ -567,71 +607,150 @@ namespace NRoute {
                     nto->p = Point(to.i, to.j);
                     nto->c = c;
                     nto->other = nfrom;
-                    from_map[nfrom->p.i][nfrom->p.j] = nfrom;
-                    to_map[nto->p.i][nto->p.j] = nto;
+                    board[nfrom->p.i][nfrom->p.j] = nfrom;
+                    target[nto->p.i][nto->p.j] = nto;
                 }
             }
+        }
+
+        Trans can_board_swap(int i1, int j1, int i2, int j2) const {
+            Trans t;
+            t.type = Trans::Type::BOARD;
+            if (abs(i1 - i2) + abs(j1 - j2) != 1) {
+                t.is_valid = false;
+                return t;
+            }
+            t.i1 = i1; t.j1 = j1; t.i2 = i2; t.j2 = j2;
+            t.diff
+                = board[i1][j1]->p.distance(board[i2][j2]->other->p)
+                + board[i2][j2]->p.distance(board[i1][j1]->other->p)
+                - board[i1][j1]->p.distance(board[i1][j1]->other->p)
+                - board[i2][j2]->p.distance(board[i2][j2]->other->p);
+            t.is_valid = true;
+            return t;
+        }
+
+        Trans can_board_swap(const Point& p1, const Point& p2) const {
+            return can_board_swap(p1.i, p1.j, p2.i, p2.j);
+        }
+
+        void board_swap(int i1, int j1, int i2, int j2) {
+            int dist =
+                board[i1][j1]->p.distance(board[i1][j1]->other->p)
+                + board[i2][j2]->p.distance(board[i2][j2]->other->p);
+            // pointer の swap
+            std::swap(board[i1][j1], board[i2][j2]);
+            // 点の swap
+            std::swap(board[i1][j1]->p, board[i2][j2]->p);
+            // !!!異なる色ならば!!!、moves に反映
+            if (board[i1][j1]->c != board[i2][j2]->c) {
+                moves.emplace_back(i1, j1, i2, j2);
+            }
+            int ndist =
+                board[i1][j1]->p.distance(board[i1][j1]->other->p)
+                + board[i2][j2]->p.distance(board[i2][j2]->other->p);
+            total_distance += ndist - dist;
+        }
+
+        void board_swap(const Point& p1, const Point& p2) {
+            return board_swap(p1.i, p1.j, p2.i, p2.j);
+        }
+
+        void board_swap(const Trans& t) {
+            std::swap(board[t.i1][t.j1], board[t.i2][t.j2]);
+            std::swap(board[t.i1][t.j1]->p, board[t.i2][t.j2]->p);
+            if (board[t.i1][t.j1]->c != board[t.i2][t.j2]->c) {
+                moves.emplace_back(t.i1, t.j1, t.i2, t.j2);
+            }
+            total_distance += t.diff;
+        }
+
+        Trans can_target_swap(int i1, int j1, int i2, int j2) const {
+            Trans t;
+            t.type = Trans::Type::TARGET;
+            // TODO: 異なる色の場合、連結成分条件チェックが必要 今は一律で false
+            if (target[i1][j1]->c != target[i2][j2]->c) {
+                t.is_valid = false;
+                return t;
+            }
+            t.i1 = i1; t.j1 = j1; t.i2 = i2; t.j2 = j2;
+            t.diff
+                = target[i1][j1]->p.distance(target[i2][j2]->other->p)
+                + target[i2][j2]->p.distance(target[i1][j1]->other->p)
+                - target[i1][j1]->p.distance(target[i1][j1]->other->p)
+                - target[i2][j2]->p.distance(target[i2][j2]->other->p);
+            t.is_valid = true;
+            return t;
+        }
+
+        Trans can_target_swap(const Point& p1, const Point& p2) const {
+            return can_target_swap(p1.i, p1.j, p2.i, p2.j);
+        }
+
+        void target_swap(int i1, int j1, int i2, int j2) {
+            int dist =
+                target[i1][j1]->p.distance(target[i1][j1]->other->p)
+                + target[i2][j2]->p.distance(target[i2][j2]->other->p);
+            // pointer の swap
+            std::swap(target[i1][j1], target[i2][j2]);
+            // 点の swap
+            std::swap(target[i1][j1]->p, target[i2][j2]->p);
+            // TODO: 異なる色の場合、条件チェックが必要
+            int ndist =
+                target[i1][j1]->p.distance(target[i1][j1]->other->p)
+                + target[i2][j2]->p.distance(target[i2][j2]->other->p);
+            total_distance += ndist - dist;
+        }
+
+        void target_swap(const Point& p1, const Point& p2) {
+            return target_swap(p1.i, p1.j, p2.i, p2.j);
+        }
+
+        void target_swap(const Trans& t) {
+            std::swap(target[t.i1][t.j1], target[t.i2][t.j2]);
+            std::swap(target[t.i1][t.j1]->p, target[t.i2][t.j2]->p);
+            total_distance += t.diff;
         }
 
         void move_node(NodePtr nto) {
             // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
             // 必ずしもこの時点での nfrom を nto に移動させる必要はない？
             // pointer をすげ替えてコストが減るなら変更すべき？
-            // TODO: 移動のバリエーションを考慮　極小dfs とか？
+            // TODO: 移動のバリエーションを考慮　極小 dfs / beamsearch とか？
             auto now_pos = nto->other->p;
             auto dst_pos = nto->p;
             int dist = now_pos.distance(dst_pos);
             // TODO: 無駄な動きがいくつか見られる: seed 17 とか？
             while (now_pos != dst_pos) {
                 // nto の色が既に揃っている場合
-                if (from_map[dst_pos.i][dst_pos.j]->c == nto->c) {
+                if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
                     // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
-                    auto p1 = nto->p;
-                    auto p2 = from_map[dst_pos.i][dst_pos.j]->other->p;
-                    // TODO: なんかもっといい方法がある気がする…
-                    std::swap(to_map[p1.i][p1.j]->p, to_map[p2.i][p2.j]->p);
-                    std::swap(to_map[p1.i][p1.j]->c, to_map[p2.i][p2.j]->c);
-                    std::swap(to_map[p1.i][p1.j], to_map[p2.i][p2.j]);
+                    target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
                     fixed[dst_pos.i][dst_pos.j] = true;
                     return;
                 }
                 // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
-                // TODO: dist を減らさなくても total_cost が 2 減るような移動を優先する？無限ループしそうではある
-                int min_cost_diff = 1000, min_cost_dir = -1;
+                Trans trans; trans.diff = 1000;
+                int min_cost_dir = -1;
                 for (int d = 0; d < 4; d++) {
                     auto next_pos = now_pos + dir[d];
                     int ndist = next_pos.distance(dst_pos);
                     if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                        // 大前提として、着目しているマスの到達距離は減る
-                        // next_pos -> now_pos の移動が到達距離を縮めるか？
-                        NodePtr from = from_map[next_pos.i][next_pos.j];
-                        NodePtr to = from->other;
-                        int dist2 = from->p.distance(to->p);
-                        int ndist2 = now_pos.distance(to->p);
-                        int diff = ndist2 - dist2 + ndist - dist;
-                        if (diff < min_cost_diff) {
-                            min_cost_diff = diff;
+                        // 大前提として、着目しているセルの到達距離は減る
+                        // 交換対象となるセルの到達距離も縮むならなお良い
+                        Trans t = can_board_swap(now_pos, next_pos);
+                        if (t.is_valid && t.diff < trans.diff) {
+                            trans = t;
                             min_cost_dir = d;
                         }
                     }
                 }
-                int d = min_cost_dir;
-                auto next_pos = now_pos + dir[d];
-                int ndist = next_pos.distance(dst_pos);
-                if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                    // 採用: now_pos, next_pos を swap する
-                    // 点の swap
-                    std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
-                    // pointer の swap
-                    std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
-                    // !!!異なる色ならば!!!、moves に反映
-                    if (from_map[now_pos.i][now_pos.j]->c != from_map[next_pos.i][next_pos.j]->c) {
-                        moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
-                    }
-                    // assign
-                    now_pos = next_pos; dist = now_pos.distance(dst_pos);
-                }
-                //vis();
+                assert(min_cost_dir != -1);
+                board_swap(trans);
+                //cerr << total_distance << ' ' << moves.size() << '\n';
+                // assign
+                now_pos += dir[min_cost_dir]; dist = now_pos.distance(dst_pos);
+                //vis(1);
             }
             // 到着したので fix
             fixed[dst_pos.i][dst_pos.j] = true;
@@ -640,8 +759,30 @@ namespace NRoute {
         void solve() {
             // route に沿って揃えていく
             for (int idx = 0; idx < N * N; idx++) {
-                NodePtr nto = to_map[route[idx].i][route[idx].j];
+                NodePtr nto = target[route[idx].i][route[idx].j];
                 move_node(nto);
+                {
+                    // target swap でコストが減らせるなら愚直に減らす
+                    vector<vector<Point>> pts(C + 1);
+                    for (int i = 1; i <= N; i++) {
+                        for (int j = 1; j <= N; j++) {
+                            pts[target[i][j]->c].emplace_back(i, j);
+                        }
+                    }
+                    for (int c = 1; c <= C; c++) {
+                        int np = pts[c].size();
+                        for (int i = 0; i < np - 1; i++) {
+                            for (int j = i + 1; j < np; j++) {
+                                Trans t = can_target_swap(pts[c][i], pts[c][j]);
+                                if (t.diff < 0) {
+                                    target_swap(t);
+                                    // cerr << t << endl;
+                                    //vis(1);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -651,7 +792,7 @@ namespace NRoute {
                 << "N = " << N << ", C = " << C << '\n';
             for (int i = 0; i < N + 2; i++) {
                 for (int j = 0; j < N + 2; j++) {
-                    oss << from_map[i][j]->c << ' ';
+                    oss << board[i][j]->c << ' ';
                 }
                 oss << '\n';
             }
@@ -682,7 +823,7 @@ namespace NRoute {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
                     cv::Rect roi(grid_size * j, grid_size * i, grid_size, grid_size);
-                    cv::rectangle(img, roi, g_color[to_map[i][j]->c], cv::FILLED);
+                    cv::rectangle(img, roi, g_color[target[i][j]->c], cv::FILLED);
                 }
             }
             // grid line
@@ -694,8 +835,8 @@ namespace NRoute {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
                     cv::Point p(grid_size * (j + 0.5), grid_size * (i + 0.5));
-                    cv::circle(img, p, grid_size / 3, g_color[from_map[i][j]->c], cv::FILLED);
-                    auto color = (from_map[i][j]->p == from_map[i][j]->other->p) ? cv::Scalar(0, 255, 255) : cv::Scalar(50, 50, 50);
+                    cv::circle(img, p, grid_size / 3, g_color[board[i][j]->c], cv::FILLED);
+                    auto color = (board[i][j]->p == board[i][j]->other->p) ? cv::Scalar(0, 255, 255) : cv::Scalar(50, 50, 50);
                     cv::circle(img, p, grid_size / 3, color, 1);
                 }
             }
@@ -710,9 +851,9 @@ namespace NRoute {
             // arrow
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
-                    auto pf = from_map[i][j]->p;
+                    auto pf = board[i][j]->p;
                     cv::Point cvpf(grid_size * (pf.j + 0.5), grid_size * (pf.i + 0.5));
-                    auto pt = from_map[i][j]->other->p;
+                    auto pt = board[i][j]->other->p;
                     cv::Point cvpt(grid_size * (pt.j + 0.5), grid_size * (pt.i + 0.5));
                     cv::arrowedLine(img, cvpf, cvpt, cv::Scalar(0, 255, 255), 1, 8, 0, 0.1);
                 }
@@ -733,9 +874,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\5.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\5.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -775,7 +916,7 @@ int main() {
 
     state.solve();
 
-    dump(state.moves.size());
+    dump(state.moves.size(), timer.elapsedMs());
 
     state.output(out);
 
