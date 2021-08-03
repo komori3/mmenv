@@ -456,9 +456,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\5.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\5.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -467,24 +467,56 @@ int main() {
 
     init(in);
 
-    Board T;
-
+    auto spiral = generate_spiral(N); // 移動は常に spiral
+    Board best_board;
+    int best_raw_score = INT_MAX;
     {
-        using namespace NStrictTransform;
-
-        auto spiral = generate_spiral(N);
+        using namespace NRoute;
+        auto zigzag = generate_zigzag(N); // 配置は zigzag も考慮
+        vector<int> perm;
+        for (int c = 1; c <= C; c++) perm.push_back(c);
         vector<int> color_list;
-        for (int c = 1; c <= C; c++) {
+        for (int c : perm) {
             for (int i = 0; i < g_count[c]; i++) {
                 color_list.push_back(c);
             }
         }
-        Board target(N + 2, vector<int>(N + 2, 0));
+        Board T1tmp(N + 2, vector<int>(N + 2, 0));
         for (int n = 0; n < N * N; n++) {
-            target[spiral[n].i][spiral[n].j] = color_list[n];
+            T1tmp[spiral[n].i][spiral[n].j] = color_list[n];
         }
 
-        State state(target);
+        int loop = 0;
+        while (timer.elapsedMs() < 2000) {
+            for (const auto& route : { zigzag, spiral }) {
+                int n = 0;
+                for (int c : perm) {
+                    for (int i = 0; i < g_count[c]; i++) {
+                        color_list[n++] = c;
+                    }
+                }
+                for (int n = 0; n < N * N; n++) {
+                    T1tmp[route[n].i][route[n].j] = color_list[n];
+                }
+                State state(T1tmp, spiral);
+                state.solve();
+                if (state.moves.size() < best_raw_score) {
+                    best_board = state.T;
+                    best_raw_score = state.moves.size();
+                    dump(best_raw_score);
+                }
+                loop++;
+            }
+            shuffle_vector(perm, rnd);
+        }
+        dump(best_raw_score, loop);
+    }
+
+    Board T;
+    {
+        using namespace NStrictTransform;
+
+        State state(best_board);
 
         // random swap
         int loop = 0, accepted = 0;
@@ -510,20 +542,23 @@ int main() {
                 }
             }
             loop++;
-            //if (!(loop & 65535)) {
-            //    dump(loop, accepted, score);
-            //    //state.vis(1);
-            //}
+            if (!(loop & 8191)) {
+                NRoute::State rstate(state.T, spiral);
+                rstate.solve();
+                //dump(loop, accepted, score, rstate.moves.size());
+                if (rstate.moves.size() < best_raw_score) {
+                    best_board = rstate.T;
+                    best_raw_score = rstate.moves.size();
+                    dump(best_raw_score);
+                }
+                //state.vis(1);
+            }
         }
-        dump(loop, accepted, score);
-
-        T = state.T;
     }
 
     {
         using namespace NRoute;
-        auto route = generate_spiral(N);
-        State state(T, route);
+        State state(best_board, spiral);
         state.solve();
         dump(state.moves.size());
         state.output(out);
