@@ -624,7 +624,7 @@ namespace NFlow {
 
             result.color_to_assign[c] = get_assign(S[c], T[c], pd);
         }
-        
+
         result.total_cost = total_cost;
 
         return result;
@@ -684,39 +684,44 @@ namespace NRoute2 {
                 auto dst_pos = nto->p;
                 int dist = now_pos.distance(dst_pos);
                 while (now_pos != dst_pos) {
-                    int d_primary = -1, d_secondary = -1;
+                    // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
+                    // TODO: dist を減らさなくても total_cost が 2 減るような移動を優先する？
+                    int min_cost_diff = 1000, min_cost_dir = -1;
                     for (int d = 0; d < 4; d++) {
                         auto next_pos = now_pos + dir[d];
                         int ndist = next_pos.distance(dst_pos);
                         if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                            if(d_secondary == -1) d_secondary = d;
-                            if (S[now_pos.i][now_pos.j] == S[next_pos.i][next_pos.j]) {
-                                if (d_primary == -1) d_primary = d;
+                            // 大前提として、着目しているマスの到達距離は減る
+                            // next_pos -> now_pos の移動が到達距離を縮めるか？
+                            NodePtr from = from_map[next_pos.i][next_pos.j];
+                            NodePtr to = from->other;
+                            int dist2 = from->p.distance(to->p);
+                            int ndist2 = now_pos.distance(to->p);
+                            int diff = ndist2 - dist2 + ndist - dist;
+                            if (diff < min_cost_diff) {
+                                min_cost_diff = diff;
+                                min_cost_dir = d;
                             }
                         }
                     }
-                    int d = (d_primary != -1) ? d_primary : d_secondary;
-                    //for (int d = 0; d < 4; d++) {
-                        auto next_pos = now_pos + dir[d];
-                        int ndist = next_pos.distance(dst_pos);
-                        // 同じ色の移動を優先処理したい
-                        
-                        if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                            // 採用: now_pos, next_pos を swap する
-                            // 点の swap
-                            std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
-                            // pointer の swap
-                            std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
-                            // 盤面の swap
-                            std::swap(S[now_pos.i][now_pos.j], S[next_pos.i][next_pos.j]);
-                            // !!!異なる色ならば!!!、moves に反映
-                            if (S[now_pos.i][now_pos.j] != S[next_pos.i][next_pos.j]) {
-                                moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
-                            }
-                            // assign
-                            now_pos = next_pos; dist = now_pos.distance(dst_pos);
+                    int d = min_cost_dir;
+                    auto next_pos = now_pos + dir[d];
+                    int ndist = next_pos.distance(dst_pos);
+                    if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
+                        // 採用: now_pos, next_pos を swap する
+                        // 点の swap
+                        std::swap(from_map[now_pos.i][now_pos.j]->p, from_map[next_pos.i][next_pos.j]->p);
+                        // pointer の swap
+                        std::swap(from_map[now_pos.i][now_pos.j], from_map[next_pos.i][next_pos.j]);
+                        // 盤面の swap
+                        std::swap(S[now_pos.i][now_pos.j], S[next_pos.i][next_pos.j]);
+                        // !!!異なる色ならば!!!、moves に反映
+                        if (S[now_pos.i][now_pos.j] != S[next_pos.i][next_pos.j]) {
+                            moves.emplace_back(now_pos.i, now_pos.j, next_pos.i, next_pos.j);
                         }
-                    //}
+                        // assign
+                        now_pos = next_pos; dist = now_pos.distance(dst_pos);
+                    }
                 }
                 // 到着したので fix
                 fixed[dst_pos.i][dst_pos.j] = true;
@@ -765,9 +770,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\3.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\5.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\3.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\5.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
