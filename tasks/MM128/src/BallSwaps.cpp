@@ -473,30 +473,29 @@ namespace NSolver {
             if (T[i1][j1] == T[i2][j2]) return true;
             int a = T[i1][j1], b = T[i2][j2];
             bool a_from = false, a_to = false, b_from = false, b_to = false;
-            // a_to
-            // T[i2][j2] の 4 近傍のどれか一つは a
+
+            // a_to: T[i2][j2] の 4 近傍のどれか一つは a
             if (g_count[a] == 1) {
+                // 1 要素のみならどこに移動しても構わない
                 a_from = a_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
                     if (T[i2 + di[d]][j2 + dj[d]] == a) {
-                        a_to = true;
-                        break;
+                        a_to = true; break;
                     }
                 }
             }
             if (!a_to) return false;
-            // b_to
-            // T[i1][j1] の 4 近傍のどれか一つは b
+
+            // b_to: T[i1][j1] の 4 近傍のどれか一つは b
             if (g_count[b] == 1) {
                 b_from = b_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
                     if (T[i1 + di[d]][j1 + dj[d]] == b) {
-                        b_to = true;
-                        break;
+                        b_to = true; break;
                     }
                 }
             }
@@ -504,29 +503,53 @@ namespace NSolver {
 
             // do swap
             std::swap(T[i1][j1], T[i2][j2]);
-
-            // a_from
-            // T[i1][j1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
+            
+            // a_from: T[i1][j1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
             if (!a_from) {
-                int lut_flag = get_lut_flag(i1, j1, a);
-                if (lut_flag == 0) a_from = true;
+                if (get_lut_flag(i1, j1, a) && !is_valid_cc(i1, j1, a)) {
+                    std::swap(T[i1][j1], T[i2][j2]);
+                    return false;
+                }
             }
+
             // b_from
             // T[i2][j2] の 8 近傍に含まれる b は、一つの連結成分に含まれる
             if (!b_from) {
-                int lut_flag = get_lut_flag(i2, j2, b);
-                if (lut_flag == 0) b_from = true;
+                if (get_lut_flag(i2, j2, b) && !is_valid_cc(i2, j2, b)) {
+                    std::swap(T[i1][j1], T[i2][j2]);
+                    return false;
+                }
             }
 
-            if (a_from && a_to && b_from && b_to) {
-                std::swap(T[i1][j1], T[i2][j2]);
-                return true;
-            }
-
-            bool ok = is_valid();
             std::swap(T[i1][j1], T[i2][j2]);
+            return true;
+        }
 
-            return ok;
+        bool is_valid_cc(int i, int j, int c) const {
+            // (i, j) の周り 4 近傍の色 c のセルが全て同一連結成分上にあるか判定する
+            static unsigned int bmask[32];
+            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
+            int si, sj, cnt = 0;
+            {
+                int sd;
+                for (sd = 0; sd < 4; sd++) if (T[i + di[sd]][j + dj[sd]] == c) break;
+                si = i + di[sd]; sj = j + dj[sd];
+            }
+            fqu.reset();
+            fqu.push((si << 5) | sj);
+            bmask[si] |= (1U << sj);
+            cnt++;
+            while (!fqu.empty()) {
+                int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
+                for (int d = 0; d < 4; d++) {
+                    int ni = ci + di[d], nj = cj + dj[d];
+                    if ((bmask[ni] & (1U << nj)) || T[ni][nj] != c) continue;
+                    fqu.push((ni << 5) | nj);
+                    bmask[ni] |= (1U << nj);
+                    cnt++;
+                }
+            }
+            return cnt == g_count[c];
         }
 
         bool is_valid() const {
@@ -744,7 +767,6 @@ namespace NSolver {
             std::swap(target[i1][j1], target[i2][j2]);
             // 点の swap
             std::swap(target[i1][j1]->p, target[i2][j2]->p);
-            // TODO: 異なる色の場合、条件チェックが必要
             int ndist =
                 target[i1][j1]->p.distance(target[i1][j1]->other->p)
                 + target[i2][j2]->p.distance(target[i2][j2]->other->p);
@@ -813,6 +835,7 @@ namespace NSolver {
             };
 
             // TODO: ノーコストの board swap も入れる -> あんまよくないかも
+            // TODO: 遷移率の向上
             int loop = 0, valid = 0, accepted = 0;
             double start_time = timer.elapsedMs(), now_time, end_time = 7500;
             while ((now_time = timer.elapsedMs()) < end_time) {
@@ -850,7 +873,6 @@ namespace NSolver {
             for (int idx = 0; idx < N * N; idx++) {
                 NodePtr nto = target[route[idx].i][route[idx].j];
                 move_node(nto);
-                // TODO: fixed 除外
                 if (false) {
                     // board swap
                     for (int i = 1; i <= N; i++) {
@@ -991,9 +1013,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\1.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\1.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
