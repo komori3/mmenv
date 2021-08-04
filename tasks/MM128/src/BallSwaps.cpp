@@ -152,6 +152,17 @@ using Path = vector<Point>;
 using Board = vector<vector<int>>;
 using Move = std::tuple<int, int, int, int>;
 
+struct CountBuf {
+    int count[1024];
+    int turn;
+    CountBuf() : turn(0) {
+        memset(count, 0, sizeof(int) * 1024);
+    }
+    inline void clear() { turn++; }
+    inline bool get(int pos) const { return count[pos] == turn; }
+    inline void set(int pos) { count[pos] = turn; }
+};
+
 
 
 /* global */
@@ -159,6 +170,7 @@ int N, C;
 Board g_board;
 vector<int> g_count;
 unsigned int g_board_mask[32];
+CountBuf bfs_counter;
 #ifdef _MSC_VER
 const vector<cv::Scalar> g_color({
     cv::Scalar(0, 0, 0),       // black (frame color)
@@ -317,7 +329,7 @@ namespace NFlow {
         }
 
         void output() {
-            for (int i = 0; i < graph.size(); i++) {
+            for (int i = 0; i < (int)graph.size(); i++) {
                 for (auto& e : graph[i]) {
                     if (e.isrev) continue;
                     auto& rev_e = graph[e.to][e.rev];
@@ -429,10 +441,8 @@ namespace NFlow {
 
 namespace NSolver {
 
-    constexpr int dy[] = { 0, -1, 0, 1 };
-    constexpr int dx[] = { 1, 0, -1, 0 };
-    constexpr int dy8[] = { 0, -1, -1, -1, 0, 1, 1, 1 };
-    constexpr int dx8[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+    constexpr int d4[] = { 1, 32, -1, -32 };
+    constexpr int d8[] = { 1, 33, 32, 31, -1, -33, -32, -31 };
     // 連結成分数差分計算高速化のためのルックアップテーブル
     constexpr int lut[] = {
       -1, 0,-1, 0, 0, 1, 0, 0,-1, 0,-1, 0, 0, 1, 0, 0,
@@ -453,48 +463,45 @@ namespace NSolver {
        0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
     }; // 0: 連結成分変化なし、-1: 連結成分 1 減少、1: 連結成分要調査
 
-    // 連結性判定用
-    // TODO: UnionFind 速度検証・打ち切り付き差分計算BFS・輪郭追跡etc...
     using cc_type = int;
     struct CC {
-
-        vector<vector<cc_type>> T;
-
-        inline int get_lut_flag(int i, int j, cc_type c) const {
+        cc_type T[1024];
+        inline int get_lut_flag(int pos, cc_type c) const {
             // 8 近傍を調べる
             int mask = 0;
             for (int d = 0; d < 8; d++) {
-                mask |= (int(c == T[i + dy8[d]][j + dx8[d]]) << d);
+                mask |= (int(c == T[pos + d8[d]]) << d);
             }
             return lut[mask];
         }
+        bool can_swap(int pos1, int pos2) {
+            // 同色なら無条件で swap 可能
+            if (T[pos1] == T[pos2]) return true;
 
-        bool can_swap(int i1, int j1, int i2, int j2) {
-            if (T[i1][j1] == T[i2][j2]) return true;
-            int a = T[i1][j1], b = T[i2][j2];
+            cc_type a = T[pos1], b = T[pos2];
             bool a_from = false, a_to = false, b_from = false, b_to = false;
 
-            // a_to: T[i2][j2] の 4 近傍のどれか一つは a
+            // a_to: T[pos2] の 4 近傍のどれか一つは a
             if (g_count[a] == 1) {
                 // 1 要素のみならどこに移動しても構わない
                 a_from = a_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
-                    if (T[i2 + di[d]][j2 + dj[d]] == a) {
+                    if (T[pos2 + d4[d]] == a) {
                         a_to = true; break;
                     }
                 }
             }
             if (!a_to) return false;
 
-            // b_to: T[i1][j1] の 4 近傍のどれか一つは b
+            // b_to: T[pos1] の 4 近傍のどれか一つは b
             if (g_count[b] == 1) {
                 b_from = b_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
-                    if (T[i1 + di[d]][j1 + dj[d]] == b) {
+                    if (T[pos1 + d4[d]] == b) {
                         b_to = true; break;
                     }
                 }
@@ -502,91 +509,52 @@ namespace NSolver {
             if (!b_to) return false;
 
             // do swap
-            std::swap(T[i1][j1], T[i2][j2]);
-            
-            // a_from: T[i1][j1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
+            std::swap(T[pos1], T[pos2]);
+
+            // a_from: T[pos1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
             if (!a_from) {
-                if (get_lut_flag(i1, j1, a) && !is_valid_cc(i1, j1, a)) {
-                    std::swap(T[i1][j1], T[i2][j2]);
+                if (get_lut_flag(pos1, a) && !is_valid_cc(pos1, a)) {
+                    std::swap(T[pos1], T[pos2]);
                     return false;
                 }
             }
 
-            // b_from
-            // T[i2][j2] の 8 近傍に含まれる b は、一つの連結成分に含まれる
+            // b_from: T[pos2] の 8 近傍に含まれる b は、一つの連結成分に含まれる
             if (!b_from) {
-                if (get_lut_flag(i2, j2, b) && !is_valid_cc(i2, j2, b)) {
-                    std::swap(T[i1][j1], T[i2][j2]);
+                if (get_lut_flag(pos2, b) && !is_valid_cc(pos2, b)) {
+                    std::swap(T[pos1], T[pos2]);
                     return false;
                 }
             }
 
-            std::swap(T[i1][j1], T[i2][j2]);
+            std::swap(T[pos1], T[pos2]);
             return true;
         }
 
-        bool is_valid_cc(int i, int j, int c) const {
-            // (i, j) の周り 4 近傍の色 c のセルが全て同一連結成分上にあるか判定する
-            static unsigned int bmask[32];
-            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
-            int si, sj, cnt = 0;
+        bool is_valid_cc(int pos, cc_type c) const {
+            // pos の周り 4 近傍の色 c のセルが全て同一連結成分上にあるか判定する
+            bfs_counter.clear();
+            int spos, cnt = 0;
             {
                 int sd;
-                for (sd = 0; sd < 4; sd++) if (T[i + di[sd]][j + dj[sd]] == c) break;
-                si = i + di[sd]; sj = j + dj[sd];
+                for (sd = 0; sd < 4; sd++) if (T[pos + d4[sd]] == c) break;
+                spos = pos + d4[sd];
             }
             fqu.reset();
-            fqu.push((si << 5) | sj);
-            bmask[si] |= (1U << sj);
+            fqu.push(spos);
+            bfs_counter.set(spos);
             cnt++;
             while (!fqu.empty()) {
-                int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
+                int cpos = fqu.pop();
                 for (int d = 0; d < 4; d++) {
-                    int ni = ci + di[d], nj = cj + dj[d];
-                    if ((bmask[ni] & (1U << nj)) || T[ni][nj] != c) continue;
-                    fqu.push((ni << 5) | nj);
-                    bmask[ni] |= (1U << nj);
+                    int npos = cpos + d4[d];
+                    if (bfs_counter.get(npos) | (T[npos] != c)) continue;
+                    fqu.push(npos);
+                    bfs_counter.set(npos);
                     cnt++;
                 }
             }
             return cnt == g_count[c];
-        }
-
-        bool is_valid() const {
-            // 各色 (0 除く) の連結成分数は 1
-            // 色 c のセル数は g_count[c] に一致
-            static unsigned int cmask;     // used color mask
-            static unsigned int bmask[32]; // used cell mask
-            // init
-            cmask = 0;
-            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
-
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    if ((bmask[i] >> j) & 1) continue; // used
-                    int c = T[i][j], cnt = 0;
-                    if ((cmask >> c) & 1) return false; // connected component > 1
-                    cmask |= (1U << c);
-                    // bfs
-                    fqu.reset();
-                    fqu.push((i << 5) | j);
-                    bmask[i] |= (1U << j);
-                    cnt++;
-                    while (!fqu.empty()) {
-                        int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
-                        for (int d = 0; d < 4; d++) {
-                            int ni = ci + di[d], nj = cj + dj[d];
-                            if ((bmask[ni] & (1U << nj)) || T[ni][nj] != c) continue;
-                            //if (((bmask[ni] >> nj) & 1) || T[ni][nj] != c) continue;
-                            fqu.push((ni << 5) | nj);
-                            bmask[ni] |= (1U << nj);
-                            cnt++;
-                        }
-                    }
-                    if (cnt != g_count[c]) return false; // pixel count violation
-                }
-            }
-            return true;
         }
     };
 
@@ -662,8 +630,7 @@ namespace NSolver {
                 }
             }
 
-            //memset(conn.T, 0, sizeof(cc_type) * (N + 2) * (N + 2));
-            conn.T.resize(N + 2, vector<cc_type>(N + 2, 0));
+            memset(conn.T, 0, sizeof(cc_type) * 1024);
             for (int c = 1; c <= C; c++) {
                 for (const auto& n2n : assign.color_to_assign[c]) {
                     const auto& from = n2n.first;
@@ -679,7 +646,7 @@ namespace NSolver {
                     nto->other = nfrom;
                     board[nfrom->p.i][nfrom->p.j] = nfrom;
                     target[nto->p.i][nto->p.j] = nto;
-                    conn.T[nto->p.i][nto->p.j] = nto->c;
+                    conn.T[(nto->p.i << 5) | nto->p.j] = nto->c;
                 }
             }
         }
@@ -739,7 +706,7 @@ namespace NSolver {
         Trans can_target_swap(int i1, int j1, int i2, int j2) {
             Trans t;
             t.type = Trans::Type::TARGET;
-            if (conn.can_swap(i1, j1, i2, j2)) {
+            if (conn.can_swap((i1 << 5) | j1, (i2 << 5) | j2)) {
                 t.i1 = i1; t.j1 = j1; t.i2 = i2; t.j2 = j2;
                 t.diff
                     = target[i1][j1]->p.distance(target[i2][j2]->other->p)
@@ -780,7 +747,7 @@ namespace NSolver {
         void target_swap(const Trans& t) {
             std::swap(target[t.i1][t.j1], target[t.i2][t.j2]);
             std::swap(target[t.i1][t.j1]->p, target[t.i2][t.j2]->p);
-            std::swap(conn.T[t.i1][t.j1], conn.T[t.i2][t.j2]);
+            std::swap(conn.T[(t.i1 << 5) | t.j1], conn.T[(t.i2 << 5) | t.j2]);
             total_distance += t.diff;
         }
 
@@ -1013,9 +980,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\1.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\1.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\2.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -1034,6 +1001,7 @@ int main() {
     dump("first assign", assign.total_cost, timer.elapsedMs() - elapsed);
 
     // 順列変更山登り
+    // TODO: いい感じに統合したい
     auto best_assign(assign);
     vector<int> best_perm = perm;
     int loop = 0;
