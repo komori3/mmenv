@@ -429,6 +429,30 @@ namespace NFlow {
 
 namespace NSolver {
 
+    constexpr int dy[] = { 0, -1, 0, 1 };
+    constexpr int dx[] = { 1, 0, -1, 0 };
+    constexpr int dy8[] = { 0, -1, -1, -1, 0, 1, 1, 1 };
+    constexpr int dx8[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+    // 連結成分数差分計算高速化のためのルックアップテーブル
+    constexpr int lut[] = {
+      -1, 0,-1, 0, 0, 1, 0, 0,-1, 0,-1, 0, 0, 1, 0, 0,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0,
+      -1, 0,-1, 0, 0, 1, 0, 0,-1, 0,-1, 0, 0, 1, 0, 0,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0,
+      -1, 0,-1, 0, 0, 1, 0, 0,-1, 0,-1, 0, 0, 1, 0, 0,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0,
+      -1, 0,-1, 0, 0, 1, 0, 0,-1, 0,-1, 0, 0, 1, 0, 0,
+       0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0,
+       0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+       1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+       0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+       0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    }; // 0: 連結成分変化なし、-1: 連結成分 1 減少、1: 連結成分要調査
+
     // 連結性判定用
     // TODO: UnionFind 速度検証・打ち切り付き差分計算BFS・輪郭追跡etc...
     using cc_type = int;
@@ -436,14 +460,23 @@ namespace NSolver {
 
         vector<vector<cc_type>> T;
 
+        inline int get_lut_flag(int i, int j, cc_type c) const {
+            // 8 近傍を調べる
+            int mask = 0;
+            for (int d = 0; d < 8; d++) {
+                mask |= (int(c == T[i + dy8[d]][j + dx8[d]]) << d);
+            }
+            return lut[mask];
+        }
+
         bool can_swap(int i1, int j1, int i2, int j2) {
             if (T[i1][j1] == T[i2][j2]) return true;
             int a = T[i1][j1], b = T[i2][j2];
-            bool a_from, a_to = false, b_from, b_to = false;
+            bool a_from = false, a_to = false, b_from = false, b_to = false;
             // a_to
             // T[i2][j2] の 4 近傍のどれか一つは a
             if (g_count[a] == 1) {
-                a_to = true;
+                a_from = a_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
@@ -457,7 +490,7 @@ namespace NSolver {
             // b_to
             // T[i1][j1] の 4 近傍のどれか一つは b
             if (g_count[b] == 1) {
-                b_to = true;
+                b_from = b_to = true;
             }
             else {
                 for (int d = 0; d < 4; d++) {
@@ -474,9 +507,21 @@ namespace NSolver {
 
             // a_from
             // T[i1][j1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
-
+            if (!a_from) {
+                int lut_flag = get_lut_flag(i1, j1, a);
+                if (lut_flag == 0) a_from = true;
+            }
             // b_from
             // T[i2][j2] の 8 近傍に含まれる b は、一つの連結成分に含まれる
+            if (!b_from) {
+                int lut_flag = get_lut_flag(i2, j2, b);
+                if (lut_flag == 0) b_from = true;
+            }
+
+            if (a_from && a_to && b_from && b_to) {
+                std::swap(T[i1][j1], T[i2][j2]);
+                return true;
+            }
 
             bool ok = is_valid();
             std::swap(T[i1][j1], T[i2][j2]);
@@ -767,6 +812,7 @@ namespace NSolver {
                 return end_temp + (start_temp - end_temp) * (T - t) / T;
             };
 
+            // TODO: ノーコストの board swap も入れる -> あんまよくないかも
             int loop = 0, valid = 0, accepted = 0;
             double start_time = timer.elapsedMs(), now_time, end_time = 7500;
             while ((now_time = timer.elapsedMs()) < end_time) {
@@ -788,7 +834,7 @@ namespace NSolver {
 
                 valid++;
 
-                double temp = get_temp(2.0, 0.1, now_time - start_time, end_time - start_time);
+                double temp = get_temp(2.0, 0.0, now_time - start_time, end_time - start_time);
                 double prob = exp(-t.diff / temp);
 
                 if (rnd.next_double() < prob) {
@@ -797,17 +843,45 @@ namespace NSolver {
                 }
 
             }
-            dump(loop, valid, accepted, total_distance);
+            dump("annealing", loop, valid, accepted, total_distance, timer.elapsedMs());
 
             // route に沿って揃えていく
+            // TODO: route のアレンジ
             for (int idx = 0; idx < N * N; idx++) {
                 NodePtr nto = target[route[idx].i][route[idx].j];
                 move_node(nto);
-                {
+                // TODO: fixed 除外
+                if (false) {
+                    // board swap
+                    for (int i = 1; i <= N; i++) {
+                        for (int j = 1; j < N; j++) {
+                            if (board[i][j]->c == board[i][j + 1]->c) {
+                                Trans t = can_board_swap(i, j, i, j + 1);
+                                assert(t.is_valid);
+                                if (t.diff < 0) {
+                                    board_swap(t);
+                                }
+                            }
+                        }
+                    }
+                    for (int i = 1; i < N; i++) {
+                        for (int j = 1; j <= N; j++) {
+                            if (board[i][j]->c == board[i + 1][j]->c) {
+                                Trans t = can_board_swap(i, j, i + 1, j);
+                                assert(t.is_valid);
+                                if (t.diff < 0) {
+                                    board_swap(t);
+                                }
+                            }
+                        }
+                    }
+                }
+                if (true) {
                     // target swap でコストが減らせるなら愚直に減らす
                     vector<vector<Point>> pts(C + 1);
                     for (int i = 1; i <= N; i++) {
                         for (int j = 1; j <= N; j++) {
+                            if (fixed[i][j]) continue;
                             pts[target[i][j]->c].emplace_back(i, j);
                         }
                     }
@@ -826,6 +900,7 @@ namespace NSolver {
                     }
                 }
             }
+            dump("routing", timer.elapsedMs());
         }
 
         std::string str() const {
@@ -933,7 +1008,8 @@ int main() {
     // 螺旋状に 11..22..33..CC を配置したときのコストを求めたい
     double elapsed = timer.elapsedMs();
     auto assign = NFlow::calc_assign(spiral, perm);
-    dump(assign.total_cost, timer.elapsedMs() - elapsed);
+
+    dump("first assign", assign.total_cost, timer.elapsedMs() - elapsed);
 
     // 順列変更山登り
     auto best_assign(assign);
@@ -953,7 +1029,7 @@ int main() {
         }
         loop++;
     }
-    dump(loop);
+    dump("climbing assign", best_assign.total_cost, loop, timer.elapsedMs());
 
     NSolver::State state(best_assign, spiral);
 
@@ -961,9 +1037,9 @@ int main() {
 
     state.solve();
 
-    dump(state.moves.size(), timer.elapsedMs());
-
     state.output(out);
+
+    dump("answer", state.moves.size(), timer.elapsedMs());
 
     return 0;
 }
