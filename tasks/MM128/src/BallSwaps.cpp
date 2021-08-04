@@ -14,7 +14,6 @@
 
 /* type */
 using uint = unsigned; using ll = long long; using ull = unsigned long long; using pii = std::pair<int, int>; using pll = std::pair<ll, ll>;
-
 /* io */
 template <typename _KTy, typename _Ty> std::ostream& operator << (std::ostream& o, const std::pair<_KTy, _Ty>& m) { o << "[" << m.first << ", " << m.second << "]"; return o; }
 template <typename _KTy, typename _Ty> std::ostream& operator << (std::ostream& o, const std::map<_KTy, _Ty>& m) { if (m.empty()) { o << "[]"; return o; } o << "[" << *m.begin(); for (auto itr = ++m.begin(); itr != m.end(); itr++) { o << ", " << *itr; } o << "]"; return o; }
@@ -34,8 +33,6 @@ namespace aux { // print tuple
     template<typename Ty, unsigned N> struct tp<Ty, N, N> { static void print(std::ostream& os, const Ty& v) { os << std::get<N>(v); } };
 }
 template<typename... Tys> std::ostream& operator<<(std::ostream& os, const std::tuple<Tys...>& t) { os << "["; aux::tp<std::tuple<Tys...>, 0, sizeof...(Tys) - 1>::print(os, t); os << "]"; return os; }
-
-
 /* fill */
 template<typename A, size_t N, typename T>
 void Fill(A(&array)[N], const T& val) {
@@ -66,12 +63,12 @@ public:
     Timer() { reset(); }
     static double time() {
 #ifdef _MSC_VER
-        return __rdtsc() / 3.0e9;
+        return __rdtsc() / 2.8e9;
 #else
         unsigned long long a, d;
         __asm__ volatile("rdtsc"
             : "=a"(a), "=d"(d));
-        return (d << 32 | a) / 3.0e9;
+        return (d << 32 | a) / 2.8e9;
 #endif
     }
     void reset() { t = time(); }
@@ -249,128 +246,36 @@ Path generate_zigzag(int N) {
     return zigzag;
 }
 
-namespace NStrictTransform {
-    // 初期盤面を S、最終盤面を T とすると問題は
-    // 1. valid な（かつ良型の） T を求めるフェーズ
-    // 2. S を T に変形するフェーズ
-    // の二段階に分けられる
-
-    // 1. はとりあえず求めるだけなら、蛇腹や螺旋の一本道に同じ色をまとめて突っ込んでいけば構築できる
-    // とりあえず求めた盤面を、制約を守りながら望ましい形に変化させていくアプローチを取る
-    // 盤面の良さは、暫定で S[i][j] == T[i][j] となるマスの個数とする
-    // -> 後で S をベースに blur を掛けたようなマップを生成して評価関数を滑らかにするのもありかも
-
-    struct State {
-        Board T;
-
-        State(const Board& T) : T(T) {}
-
-        int calc_score() const {
-            int score = 0;
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    score += T[i][j] == g_board[i][j];
-                }
-            }
-            return score;
-        }
-
-        bool is_valid() const {
-            // 各色 (0 除く) の連結成分数は 1
-            // 色 c のセル数は g_count[c] に一致
-            static unsigned int cmask;     // used color mask
-            static unsigned int bmask[32]; // used cell mask
-            // init
-            cmask = 0;
-            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
-
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    if ((bmask[i] >> j) & 1) continue; // used
-                    int c = T[i][j], cnt = 0;
-                    if ((cmask >> c) & 1) return false; // connected component > 1
-                    cmask |= (1U << c);
-                    // bfs
-                    fqu.reset();
-                    fqu.push((i << 5) | j);
-                    bmask[i] |= (1U << j);
-                    cnt++;
-                    while (!fqu.empty()) {
-                        int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
-                        for (int d = 0; d < 4; d++) {
-                            int ni = ci + di[d], nj = cj + dj[d];
-                            if (((bmask[ni] >> nj) & 1) || T[ni][nj] != c) continue;
-                            fqu.push((ni << 5) | nj);
-                            bmask[ni] |= (1U << nj);
-                            cnt++;
-                        }
-                    }
-                    if (cnt != g_count[c]) return false; // pixel count violation
-                }
-            }
-            return true;
-        }
-
-#ifdef _MSC_VER
-        void vis(int delay = 0) const {
-            int grid_size = 960 / (N + 2);
-            int height = grid_size * (N + 2), width = grid_size * (N + 2);
-            cv::Mat_<cv::Vec3b> img(height, width, cv::Vec3b(255, 255, 255));
-            for (int i = 0; i < N + 2; i++) {
-                for (int j = 0; j < N + 2; j++) {
-                    if (g_board[i][j] == T[i][j]) {
-                        cv::rectangle(img, cv::Rect(grid_size * j, grid_size * i, grid_size, grid_size), cv::Scalar(0, 255, 255), cv::FILLED);
-                    }
-                    if (g_board[i][j]) {
-                        cv::circle(img, cv::Point(grid_size * (j + 0.5), grid_size * (i + 0.5)), grid_size / 3, g_color[T[i][j]], cv::FILLED);
-                    }
-                    else {
-                        cv::rectangle(img, cv::Rect(grid_size * j, grid_size * i, grid_size, grid_size), cv::Scalar(0, 0, 0), cv::FILLED);
-                    }
-                }
-            }
-            for (int i = 1; i < N + 2; i++) {
-                cv::line(img, cv::Point(0, i * grid_size), cv::Point((N + 2) * grid_size, i * grid_size), cv::Scalar(0, 0, 0));
-                cv::line(img, cv::Point(i * grid_size, 0), cv::Point(i * grid_size, (N + 2) * grid_size), cv::Scalar(0, 0, 0));
-            }
-            cv::imshow("img", img);
-            cv::waitKey(delay);
-        }
-#endif
-    };
-}
-
 namespace NFlow {
 
-    template<typename flow_t, typename cost_t>
     struct PrimalDual {
-        const cost_t INF;
+        const int INF;
 
         struct edge {
             int to;
-            flow_t cap;
-            cost_t cost;
+            int cap;
+            int cost;
             int rev;
             bool isrev;
-            edge(int to = -1, flow_t cap = -1, cost_t cost = -1, int rev = -1, bool isrev = false)
+            edge(int to = -1, int cap = -1, int cost = -1, int rev = -1, bool isrev = false)
                 : to(to), cap(cap), cost(cost), rev(rev), isrev(isrev) {}
         };
 
         vector<vector<edge>> graph;
-        vector<cost_t> potential, min_cost;
+        vector<int> potential, min_cost;
         vector<int> prevv, preve;
 
-        PrimalDual(int V) : INF(std::numeric_limits<cost_t>::max()), graph(V) {}
+        PrimalDual(int V) : INF(std::numeric_limits<int>::max()), graph(V) {}
 
-        void add_edge(int from, int to, flow_t cap, cost_t cost) {
+        void add_edge(int from, int to, int cap, int cost) {
             graph[from].emplace_back(to, cap, cost, (int)graph[to].size(), false);
             graph[to].emplace_back(from, 0, -cost, (int)graph[from].size() - 1, true);
         }
 
-        cost_t min_cost_flow(int s, int t, flow_t f) {
+        int min_cost_flow(int s, int t, int f) {
             int V = (int)graph.size();
-            cost_t ret = 0;
-            using Pi = std::pair<cost_t, int>;
+            int ret = 0;
+            using Pi = ll;
             std::priority_queue<Pi, vector<Pi>, std::greater<Pi>> que;
             potential.assign(V, 0);
             preve.assign(V, -1);
@@ -378,25 +283,25 @@ namespace NFlow {
 
             while (f > 0) {
                 min_cost.assign(V, INF);
-                que.emplace(0, s);
+                que.emplace(s);
                 min_cost[s] = 0;
                 while (!que.empty()) {
-                    Pi p = que.top();
-                    que.pop();
-                    if (min_cost[p.second] < p.first) continue;
-                    for (int i = 0; i < (int)graph[p.second].size(); i++) {
-                        edge& e = graph[p.second][i];
-                        cost_t nextCost = min_cost[p.second] + e.cost + potential[p.second] - potential[e.to];
+                    Pi p = que.top(); que.pop();
+                    int pf = p >> 32, ps = p & 0xFFFFFFFFLL;
+                    if (min_cost[ps] < pf) continue;
+                    for (int i = 0; i < (int)graph[ps].size(); i++) {
+                        edge& e = graph[ps][i];
+                        int nextCost = min_cost[ps] + e.cost + potential[ps] - potential[e.to];
                         if (e.cap > 0 && min_cost[e.to] > nextCost) {
                             min_cost[e.to] = nextCost;
-                            prevv[e.to] = p.second, preve[e.to] = i;
-                            que.emplace(min_cost[e.to], e.to);
+                            prevv[e.to] = ps, preve[e.to] = i;
+                            que.emplace(((ll)min_cost[e.to] << 32) | e.to);
                         }
                     }
                 }
                 if (min_cost[t] == INF) return -1;
                 for (int v = 0; v < V; v++) potential[v] += min_cost[v];
-                flow_t addflow = f;
+                int addflow = f;
                 for (int v = t; v != s; v = prevv[v]) {
                     addflow = std::min(addflow, graph[prevv[v]][preve[v]].cap);
                 }
@@ -442,7 +347,7 @@ namespace NFlow {
     };
 
     vector<Assign> get_assign(
-        const vector<Node>& S, const vector<Node>& T, const PrimalDual<int, int>& pd) {
+        const vector<Node>& S, const vector<Node>& T, const PrimalDual& pd) {
         int ns = S.size();
         vector<Assign> assign;
         for (int u = 1; u <= (int)S.size(); u++) {
@@ -491,7 +396,7 @@ namespace NFlow {
         for (int c = 1; c <= C; c++) {
             int ns = S[c].size(), nt = T[c].size();
             int V = ns + nt + 2;
-            PrimalDual<int, int> pd(V);
+            PrimalDual pd(V);
             // u=0 から v in 1..s に容量 1, コスト 0 の辺を張る
             for (const auto& v : S[c]) {
                 pd.add_edge(0, v.id, 1, 0);
@@ -522,7 +427,100 @@ namespace NFlow {
 
 }
 
-namespace NRoute {
+namespace NSolver {
+
+    // 連結性判定用
+    // TODO: UnionFind 速度検証・打ち切り付き差分計算BFS・輪郭追跡etc...
+    using cc_type = int;
+    struct CC {
+
+        vector<vector<cc_type>> T;
+
+        bool can_swap(int i1, int j1, int i2, int j2) {
+            if (T[i1][j1] == T[i2][j2]) return true;
+            int a = T[i1][j1], b = T[i2][j2];
+            bool a_from, a_to = false, b_from, b_to = false;
+            // a_to
+            // T[i2][j2] の 4 近傍のどれか一つは a
+            if (g_count[a] == 1) {
+                a_to = true;
+            }
+            else {
+                for (int d = 0; d < 4; d++) {
+                    if (T[i2 + di[d]][j2 + dj[d]] == a) {
+                        a_to = true;
+                        break;
+                    }
+                }
+            }
+            if (!a_to) return false;
+            // b_to
+            // T[i1][j1] の 4 近傍のどれか一つは b
+            if (g_count[b] == 1) {
+                b_to = true;
+            }
+            else {
+                for (int d = 0; d < 4; d++) {
+                    if (T[i1 + di[d]][j1 + dj[d]] == b) {
+                        b_to = true;
+                        break;
+                    }
+                }
+            }
+            if (!b_to) return false;
+
+            // do swap
+            std::swap(T[i1][j1], T[i2][j2]);
+
+            // a_from
+            // T[i1][j1] の 8 近傍に含まれる a は、一つの連結成分に含まれる
+
+            // b_from
+            // T[i2][j2] の 8 近傍に含まれる b は、一つの連結成分に含まれる
+
+            bool ok = is_valid();
+            std::swap(T[i1][j1], T[i2][j2]);
+
+            return ok;
+        }
+
+        bool is_valid() const {
+            // 各色 (0 除く) の連結成分数は 1
+            // 色 c のセル数は g_count[c] に一致
+            static unsigned int cmask;     // used color mask
+            static unsigned int bmask[32]; // used cell mask
+            // init
+            cmask = 0;
+            memcpy(bmask, g_board_mask, sizeof(unsigned int) * 32);
+
+            for (int i = 1; i <= N; i++) {
+                for (int j = 1; j <= N; j++) {
+                    if ((bmask[i] >> j) & 1) continue; // used
+                    int c = T[i][j], cnt = 0;
+                    if ((cmask >> c) & 1) return false; // connected component > 1
+                    cmask |= (1U << c);
+                    // bfs
+                    fqu.reset();
+                    fqu.push((i << 5) | j);
+                    bmask[i] |= (1U << j);
+                    cnt++;
+                    while (!fqu.empty()) {
+                        int cij = fqu.pop(), ci = (cij >> 5), cj = (cij & 0b11111);
+                        for (int d = 0; d < 4; d++) {
+                            int ni = ci + di[d], nj = cj + dj[d];
+                            if ((bmask[ni] & (1U << nj)) || T[ni][nj] != c) continue;
+                            //if (((bmask[ni] >> nj) & 1) || T[ni][nj] != c) continue;
+                            fqu.push((ni << 5) | nj);
+                            bmask[ni] |= (1U << nj);
+                            cnt++;
+                        }
+                    }
+                    if (cnt != g_count[c]) return false; // pixel count violation
+                }
+            }
+            return true;
+        }
+    };
 
     struct Node;
     using NodePtr = std::shared_ptr<Node>;
@@ -569,6 +567,8 @@ namespace NRoute {
         vector<vector<NodePtr>> board; // 目的地情報付き現在地
         vector<vector<NodePtr>> target;   // 現在地情報付き目的地
 
+        CC conn;
+
         vector<Move> moves; // 移動履歴
         int total_distance;
 
@@ -587,13 +587,15 @@ namespace NRoute {
             fixed(N + 2, vector<bool>(N + 2, true)),
             board(N + 2, vector<NodePtr>(N + 2, nullptr)),
             target(N + 2, vector<NodePtr>(N + 2, nullptr)),
-            total_distance(assign.total_cost)
-        {
+            total_distance(assign.total_cost) {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
                     fixed[i][j] = false;
                 }
             }
+
+            //memset(conn.T, 0, sizeof(cc_type) * (N + 2) * (N + 2));
+            conn.T.resize(N + 2, vector<cc_type>(N + 2, 0));
             for (int c = 1; c <= C; c++) {
                 for (const auto& n2n : assign.color_to_assign[c]) {
                     const auto& from = n2n.first;
@@ -609,6 +611,7 @@ namespace NRoute {
                     nto->other = nfrom;
                     board[nfrom->p.i][nfrom->p.j] = nfrom;
                     target[nto->p.i][nto->p.j] = nto;
+                    conn.T[nto->p.i][nto->p.j] = nto->c;
                 }
             }
         }
@@ -665,25 +668,26 @@ namespace NRoute {
             total_distance += t.diff;
         }
 
-        Trans can_target_swap(int i1, int j1, int i2, int j2) const {
+        Trans can_target_swap(int i1, int j1, int i2, int j2) {
             Trans t;
             t.type = Trans::Type::TARGET;
-            // TODO: 異なる色の場合、連結成分条件チェックが必要 今は一律で false
-            if (target[i1][j1]->c != target[i2][j2]->c) {
+            if (conn.can_swap(i1, j1, i2, j2)) {
+                t.i1 = i1; t.j1 = j1; t.i2 = i2; t.j2 = j2;
+                t.diff
+                    = target[i1][j1]->p.distance(target[i2][j2]->other->p)
+                    + target[i2][j2]->p.distance(target[i1][j1]->other->p)
+                    - target[i1][j1]->p.distance(target[i1][j1]->other->p)
+                    - target[i2][j2]->p.distance(target[i2][j2]->other->p);
+                t.is_valid = true;
+                return t;
+            }
+            else {
                 t.is_valid = false;
                 return t;
             }
-            t.i1 = i1; t.j1 = j1; t.i2 = i2; t.j2 = j2;
-            t.diff
-                = target[i1][j1]->p.distance(target[i2][j2]->other->p)
-                + target[i2][j2]->p.distance(target[i1][j1]->other->p)
-                - target[i1][j1]->p.distance(target[i1][j1]->other->p)
-                - target[i2][j2]->p.distance(target[i2][j2]->other->p);
-            t.is_valid = true;
-            return t;
         }
 
-        Trans can_target_swap(const Point& p1, const Point& p2) const {
+        Trans can_target_swap(const Point& p1, const Point& p2) {
             return can_target_swap(p1.i, p1.j, p2.i, p2.j);
         }
 
@@ -709,6 +713,7 @@ namespace NRoute {
         void target_swap(const Trans& t) {
             std::swap(target[t.i1][t.j1], target[t.i2][t.j2]);
             std::swap(target[t.i1][t.j1]->p, target[t.i2][t.j2]->p);
+            std::swap(conn.T[t.i1][t.j1], conn.T[t.i2][t.j2]);
             total_distance += t.diff;
         }
 
@@ -757,6 +762,43 @@ namespace NRoute {
         }
 
         void solve() {
+
+            auto get_temp = [](double start_temp, double end_temp, double t, double T) {
+                return end_temp + (start_temp - end_temp) * (T - t) / T;
+            };
+
+            int loop = 0, valid = 0, accepted = 0;
+            double start_time = timer.elapsedMs(), now_time, end_time = 7500;
+            while ((now_time = timer.elapsedMs()) < end_time) {
+                loop++;
+                if (!(loop & 0xFFFFF)) {
+                    dump(loop, valid, accepted, total_distance);
+                    //vis(1);
+                }
+
+                int i1 = rnd.next_int(N) + 1, j1 = rnd.next_int(N) + 1, i2, j2;
+                do {
+                    i2 = rnd.next_int(N) + 1;
+                    j2 = rnd.next_int(N) + 1;
+                } while (i1 == i2 && j1 == j2);
+
+                Trans t = can_target_swap(i1, j1, i2, j2);
+
+                if (!t.is_valid) continue;
+
+                valid++;
+
+                double temp = get_temp(2.0, 0.1, now_time - start_time, end_time - start_time);
+                double prob = exp(-t.diff / temp);
+
+                if (rnd.next_double() < prob) {
+                    accepted++;
+                    target_swap(t);
+                }
+
+            }
+            dump(loop, valid, accepted, total_distance);
+
             // route に沿って揃えていく
             for (int idx = 0; idx < N * N; idx++) {
                 NodePtr nto = target[route[idx].i][route[idx].j];
@@ -777,7 +819,7 @@ namespace NRoute {
                                 if (t.diff < 0) {
                                     target_swap(t);
                                     // cerr << t << endl;
-                                    //vis(1);
+                                    // vis(1);
                                 }
                             }
                         }
@@ -896,7 +938,8 @@ int main() {
     // 順列変更山登り
     auto best_assign(assign);
     vector<int> best_perm = perm;
-    while (timer.elapsedMs() < 5000) {
+    int loop = 0;
+    while (timer.elapsedMs() < 3000) {
         int i = rnd.next_int(C), j;
         do {
             j = rnd.next_int(C);
@@ -908,9 +951,11 @@ int main() {
             best_perm = perm;
             dump(best_assign.total_cost, timer.elapsedMs());
         }
+        loop++;
     }
+    dump(loop);
 
-    NRoute::State state(best_assign, spiral);
+    NSolver::State state(best_assign, spiral);
 
     //state.vis();
 
