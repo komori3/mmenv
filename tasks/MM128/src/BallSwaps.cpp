@@ -294,8 +294,8 @@ std::map<int, Path> generate_order(int N) {
     double ci = N / 2.0 + 0.5, cj = ci;
     for (int i = 1; i <= N; i++) {
         for (int j = 1; j <= N; j++) {
-            int dist = (int)(abs(i - ci) + abs(j - cj) + 1e-6);
-            double rad = atan2(i - ci, j - cj);
+            int dist = (int)(fabs((double)i - ci) + fabs((double)j - cj) + 0.5);
+            double rad = atan2((double)i - ci, (double)j - cj);
             tup.emplace_back(dist, rad, i, j);
         }
     }
@@ -650,12 +650,16 @@ namespace NSolver {
     };
 
     struct Trans {
-        enum struct Type { BOARD, TARGET };
+        enum struct Type { BOARD, TARGET, FIX };
         Type type;
         int i1, j1, i2, j2;
         int diff;
         bool is_valid;
-
+        Trans(
+            Trans::Type type = Trans::Type::BOARD,
+            int i1 = -1, int j1 = -1, int i2 = -1, int j2 = -1,
+            int diff = -1, bool is_valid = false
+        ) : type(type), i1(i1), j1(j1), i2(i2), j2(j2), diff(diff), is_valid(is_valid) {}
         std::string str() const {
             return format("Trans [type=%d, i1=%d, j1=%d, i2=%d, j2=%d, diff=%d, is_valid=%d]", type, i1, j1, i2, j2, diff, is_valid);
         }
@@ -680,6 +684,8 @@ namespace NSolver {
 
         int total_distance; // 割当てした各点の (現在位置, 目標位置) のマンハッタン距離の総和
 
+        vector<Trans> history; // undo 用
+
         // 2 つの遷移を考える
 
         // 1. 4-adjacent な 2 点の'現在地'を入れ替える
@@ -693,9 +699,9 @@ namespace NSolver {
 
         State(const NFlow::Result& assign, const std::map<int, Path>& order_map) :
             assign(assign), order_map(order_map),
-            fixed(N + 2, vector<bool>(N + 2, true)),
             board(N + 2, vector<NodePtr>(N + 2, nullptr)),
             target(N + 2, vector<NodePtr>(N + 2, nullptr)),
+            fixed(N + 2, vector<bool>(N + 2, true)),
             total_distance(assign.total_cost) {
             for (int i = 1; i <= N; i++) {
                 for (int j = 1; j <= N; j++) {
@@ -748,7 +754,7 @@ namespace NSolver {
             return can_board_swap(p1.i, p1.j, p2.i, p2.j);
         }
 
-        void board_swap(int i1, int j1, int i2, int j2) {
+        void board_swap(int i1, int j1, int i2, int j2, bool commit = false) {
             int dist =
                 board[i1][j1]->p.distance(board[i1][j1]->other->p)
                 + board[i2][j2]->p.distance(board[i2][j2]->other->p);
@@ -764,19 +770,23 @@ namespace NSolver {
                 board[i1][j1]->p.distance(board[i1][j1]->other->p)
                 + board[i2][j2]->p.distance(board[i2][j2]->other->p);
             total_distance += ndist - dist;
+            if (commit) {
+                history.emplace_back(Trans::Type::BOARD, i1, j1, i2, j2, ndist - dist, true);
+            }
         }
 
-        void board_swap(const Point& p1, const Point& p2) {
-            return board_swap(p1.i, p1.j, p2.i, p2.j);
+        void board_swap(const Point& p1, const Point& p2, bool commit = false) {
+            return board_swap(p1.i, p1.j, p2.i, p2.j, commit);
         }
 
-        void board_swap(const Trans& t) {
+        void board_swap(const Trans& t, bool commit = false) {
             std::swap(board[t.i1][t.j1], board[t.i2][t.j2]);
             std::swap(board[t.i1][t.j1]->p, board[t.i2][t.j2]->p);
             if (board[t.i1][t.j1]->c != board[t.i2][t.j2]->c) {
                 moves.emplace_back(t.i1, t.j1, t.i2, t.j2);
             }
             total_distance += t.diff;
+            if (commit) history.push_back(t);
         }
 
         void undo_board_swap(const Trans& t) {
@@ -786,6 +796,17 @@ namespace NSolver {
             }
             std::swap(board[t.i1][t.j1]->p, board[t.i2][t.j2]->p);
             std::swap(board[t.i1][t.j1], board[t.i2][t.j2]);
+        }
+
+        void fix(int i, int j, bool commit = false) {
+            fixed[i][j] = true;
+            if (commit) {
+                history.emplace_back(Trans::Type::FIX, i, j, -1, -1, -1, true);
+            }
+        }
+
+        void undo_fix(const Trans& t) {
+            fixed[t.i1][t.j1] = false;
         }
 
         Trans can_target_swap(int i1, int j1, int i2, int j2) {
@@ -811,7 +832,7 @@ namespace NSolver {
             return can_target_swap(p1.i, p1.j, p2.i, p2.j);
         }
 
-        void target_swap(int i1, int j1, int i2, int j2) {
+        void target_swap(int i1, int j1, int i2, int j2, bool commit = false) {
             int dist =
                 target[i1][j1]->p.distance(target[i1][j1]->other->p)
                 + target[i2][j2]->p.distance(target[i2][j2]->other->p);
@@ -819,21 +840,79 @@ namespace NSolver {
             std::swap(target[i1][j1], target[i2][j2]);
             // 点の swap
             std::swap(target[i1][j1]->p, target[i2][j2]->p);
+            std::swap(conn.T[(i1 << 5) | j1], conn.T[(i2 << 5) | j2]);
             int ndist =
                 target[i1][j1]->p.distance(target[i1][j1]->other->p)
                 + target[i2][j2]->p.distance(target[i2][j2]->other->p);
             total_distance += ndist - dist;
+            if (commit) {
+                history.emplace_back(Trans::Type::TARGET, i1, j1, i2, j2, ndist - dist, true);
+            }
         }
 
-        void target_swap(const Point& p1, const Point& p2) {
-            return target_swap(p1.i, p1.j, p2.i, p2.j);
+        void target_swap(const Point& p1, const Point& p2, bool commit = false) {
+            return target_swap(p1.i, p1.j, p2.i, p2.j, commit);
         }
 
-        void target_swap(const Trans& t) {
+        void target_swap(const Trans& t, bool commit = false) {
             std::swap(target[t.i1][t.j1], target[t.i2][t.j2]);
             std::swap(target[t.i1][t.j1]->p, target[t.i2][t.j2]->p);
             std::swap(conn.T[(t.i1 << 5) | t.j1], conn.T[(t.i2 << 5) | t.j2]);
             total_distance += t.diff;
+            if (commit) history.push_back(t);
+        }
+
+        void undo_target_swap(const Trans& t) {
+            total_distance -= t.diff;
+            std::swap(conn.T[(t.i1 << 5) | t.j1], conn.T[(t.i2 << 5) | t.j2]);
+            std::swap(target[t.i1][t.j1]->p, target[t.i2][t.j2]->p);
+            std::swap(target[t.i1][t.j1], target[t.i2][t.j2]);
+        }
+
+        Trans undo() {
+            Trans t = history.back(); history.pop_back();
+            switch (t.type) {
+            case NSolver::Trans::Type::BOARD:
+                undo_board_swap(t);
+                break;
+            case NSolver::Trans::Type::TARGET:
+                undo_target_swap(t);
+                break;
+            case NSolver::Trans::Type::FIX:
+                undo_fix(t);
+                break;
+            }
+            return t;
+        }
+
+        void transition(const Trans& t, bool commit = false) {
+            switch (t.type) {
+            case NSolver::Trans::Type::BOARD:
+                board_swap(t, commit);
+                break;
+            case NSolver::Trans::Type::TARGET:
+                target_swap(t, commit);
+                break;
+            case NSolver::Trans::Type::FIX:
+                fix(t.i1, t.j1, commit);
+                break;
+            }
+        }
+
+        void transition(const vector<Trans>& ts, bool commit = false) {
+            for (const auto& t : ts) transition(t, commit);
+        }
+
+        int get_checkpoint() const { return history.size(); }
+
+        vector<Trans> rollback(int checkpoint = 0) {
+            vector<Trans> res;
+            while ((int)history.size() != checkpoint) {
+                res.push_back(undo());
+                //vis(1);
+            }
+            std::reverse(res.begin(), res.end());
+            return res;
         }
 
         void target_swap_annealing() {
@@ -843,7 +922,7 @@ namespace NSolver {
             };
 
             int loop = 0, valid = 0, accepted = 0;
-            double start_time = timer.elapsedMs(), now_time, end_time = 7500;
+            double start_time = timer.elapsedMs(), now_time, end_time = 7000;
             while ((now_time = timer.elapsedMs()) < end_time) {
                 loop++;
                 if (!(loop & 0xFFFFF)) {
@@ -875,8 +954,6 @@ namespace NSolver {
             dump("annealing", loop, valid, accepted, total_distance, timer.elapsedMs());
         }
 
-
-
         void move_node(NodePtr nto) {
             // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
             // TODO: 移動のバリエーションを考慮　極小 dfs / beamsearch とか？
@@ -901,11 +978,12 @@ namespace NSolver {
                         }
                     }
                 }
-                board_swap(trans);
+                assert(min_cost_dir != -1);
+                board_swap(trans, true);
                 now_pos += dir[min_cost_dir]; dist = now_pos.distance(dst_pos);
             }
             // 到着したので fix
-            fixed[dst_pos.i][dst_pos.j] = true;
+            fix(dst_pos.i, dst_pos.j, true);
         }
 
         int post_process() {
@@ -918,7 +996,7 @@ namespace NSolver {
                             Trans t = can_board_swap(i, j, i, j + 1);
                             if (t.diff < 0) {
                                 num_improved++;
-                                board_swap(t);
+                                board_swap(t, true);
                             }
                         }
                     }
@@ -929,7 +1007,7 @@ namespace NSolver {
                             Trans t = can_board_swap(i, j, i + 1, j);
                             if (t.diff < 0) {
                                 num_improved++;
-                                board_swap(t);
+                                board_swap(t, true);
                             }
                         }
                     }
@@ -951,7 +1029,7 @@ namespace NSolver {
                             Trans t = can_target_swap(pts[c][i], pts[c][j]);
                             if (t.diff < 0) {
                                 num_improved++;
-                                target_swap(t);
+                                target_swap(t, true);
                                 // vis(1);
                             }
                         }
@@ -966,32 +1044,57 @@ namespace NSolver {
             // TODO: order のアレンジ
             vector<std::pair<int, Path>> dist_to_points(order_map.rbegin(), order_map.rend());
 
+            // TODO: 時間配分をうまく考える
+            int gain = 0;
             for (const auto& elem : dist_to_points) {
                 int dist = elem.first;
-                Path points = elem.second;
-                // 到達距離の長い順にソートしてみる
-                std::sort(points.begin(), points.end(), [&](const Point& p1, const Point& p2) {
-                    NodePtr np1f = board[p1.i][p1.j], np1t = np1f->other;
-                    NodePtr np2f = board[p2.i][p2.j], np2t = np2f->other;
-                    return np1f->p.distance(np1t->p) > np2f->p.distance(np2t->p);
-                });
-                for (const auto& p : points) {
-                    NodePtr nto = target[p.i][p.j];
 
-                    auto dst_pos = nto->p;
-                    if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
-                        // nto の色が既に揃っている場合
-                        // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
-                        target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
-                        fixed[dst_pos.i][dst_pos.j] = true;
-                    }
-                    else {
-                        move_node(nto);
-                    }
+                // 処理順を変えて何度か試行して最もよいものを採用
+                //int checkpoint = get_checkpoint();
 
-                    post_process();
+                int best_score = INT_MIN;
+                vector<Trans> best_moves;
+
+                Path orders(elem.second);
+                for (int loop = 0; loop < 3; loop++) {
+                    int checkpoint = get_checkpoint();
+                    int prev_dist = total_distance, prev_moves = moves.size();
+                    for (const auto& p : orders) {
+                        NodePtr nto = target[p.i][p.j];
+                        auto dst_pos = nto->p;
+                        if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
+                            // nto の色が既に揃っている場合
+                            // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
+                            target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p, true);
+                            fix(dst_pos.i, dst_pos.j, true);
+                        }
+                        else {
+                            move_node(nto);
+                        }
+                        post_process(); // TODO: 後で一気にやる？
+                    }
+                    int now_dist = total_distance, now_moves = moves.size();
+                    int score = (prev_dist - now_dist) - (now_moves - prev_moves);
+                    auto mvs = rollback(checkpoint);
+                    if (best_score < score) {
+                        best_score = score;
+                        best_moves = mvs;
+                        dump(elem.first, loop, best_score);
+                    }
+                    if (N % 2 == 0 && dist == 1) {
+                        // 2x2 領域を "〆" のようなルートで走査すると invalid な状況が発生する
+                        // 初期点列は偏角でソートされているのでそのようなことは起こらない
+                        // 1 回きりで break
+                        break;
+                    }
+                    shuffle_vector(orders, rnd);
                 }
+
+                gain += best_score;
+                transition(best_moves);
             }
+
+            dump(gain, gain + moves.size());
             dump("routing", timer.elapsedMs());
         }
 
@@ -1088,9 +1191,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\6.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\7.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\6.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\7.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -1122,7 +1225,7 @@ int main() {
     auto best_assign(assign);
     vector<int> best_perm = perm;
     int loop = 0;
-    while (timer.elapsedMs() < 3000) { // 長すぎ...？
+    while (timer.elapsedMs() < 2500) { // 長すぎ...？
         int i = rnd.next_int(C), j;
         do { j = rnd.next_int(C); } while (i == j);
         std::swap(perm[i], perm[j]);
