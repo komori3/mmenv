@@ -210,6 +210,55 @@ inline bool is_inside(const Point& p) {
     return 1 <= p.i && p.i <= N && 1 <= p.j && p.j <= N;
 }
 
+Path generate_double_spiral(int N) {
+    Path spiral;
+    vector<vector<bool>> visited(N + 2, vector<bool>(N + 2, true));
+    for (int i = 1; i <= N; i++) {
+        for (int j = 1; j <= N; j++) {
+            visited[i][j] = false;
+        }
+    }
+    Point p(1, 1);
+    int d = 0;
+    spiral.push_back(p);
+    visited[p.i][p.j] = true;
+    while (true) {
+        if (!visited[p.i + 2 * dir[d].i][p.j + 2 * dir[d].j]) {
+            p += dir[d];
+            spiral.push_back(p);
+            visited[p.i][p.j] = true;
+        }
+        else if (!visited[p.i + 2 * dir[(d + 1) & 3].i][p.j + 2 * dir[(d + 1) & 3].j]) {
+            d = (d + 1) & 3;
+            p += dir[d];
+            spiral.push_back(p);
+            visited[p.i][p.j] = true;
+        }
+        else {
+            break;
+        }
+    }
+    d = (d + 1) & 3;
+    while (true) {
+        if (!visited[p.i + dir[d].i][p.j + dir[d].j]) {
+            p += dir[d];
+            spiral.push_back(p);
+            visited[p.i][p.j] = true;
+        }
+        else if (!visited[p.i + dir[(d + 3) & 3].i][p.j + dir[(d + 3) & 3].j]) {
+            d = (d + 3) & 3;
+            p += dir[d];
+            spiral.push_back(p);
+            visited[p.i][p.j] = true;
+        }
+        else {
+            break;
+        }
+    }
+    assert(spiral.size() == N * N);
+    return spiral;
+}
+
 Path generate_spiral(int N) {
     Path spiral;
     vector<vector<bool>> visited(N + 2, vector<bool>(N + 2, true));
@@ -239,6 +288,31 @@ Path generate_spiral(int N) {
         }
     }
     return spiral;
+}
+
+Path generate_route(int N) {
+    vector<std::tuple<double, double, int, int>> tup;
+    double ci = N / 2.0 + 0.5, cj = ci;
+    for (int i = 1; i <= N; i++) {
+        for (int j = 1; j <= N; j++) {
+            double dist = abs(i - ci) + abs(j - cj);
+            double rad = atan2(i - ci, j - cj);
+            tup.emplace_back(dist, rad, i, j);
+        }
+    }
+    sort(tup.begin(), tup.end());
+    std::reverse(tup.begin(), tup.end());
+    // TODO: 距離ごとに偏角ソート
+
+    Path route;
+    for (const auto& t : tup) {
+        double _, __;
+        int i, j;
+        std::tie(_, __, i, j) = t;
+        route.emplace_back(i, j);
+    }
+
+    return route;
 }
 
 Path generate_zigzag(int N) {
@@ -751,58 +825,12 @@ namespace NSolver {
             total_distance += t.diff;
         }
 
-        void move_node(NodePtr nto) {
-            // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
-            // 必ずしもこの時点での nfrom を nto に移動させる必要はない？
-            // pointer をすげ替えてコストが減るなら変更すべき？
-            // TODO: 移動のバリエーションを考慮　極小 dfs / beamsearch とか？
-            auto now_pos = nto->other->p;
-            auto dst_pos = nto->p;
-            int dist = now_pos.distance(dst_pos);
-            // TODO: 無駄な動きがいくつか見られる: seed 17 とか？
-            while (now_pos != dst_pos) {
-                // nto の色が既に揃っている場合
-                if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
-                    // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
-                    target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
-                    fixed[dst_pos.i][dst_pos.j] = true;
-                    return;
-                }
-                // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
-                Trans trans; trans.diff = 1000;
-                int min_cost_dir = -1;
-                for (int d = 0; d < 4; d++) {
-                    auto next_pos = now_pos + dir[d];
-                    int ndist = next_pos.distance(dst_pos);
-                    if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
-                        // 大前提として、着目しているセルの到達距離は減る
-                        // 交換対象となるセルの到達距離も縮むならなお良い
-                        Trans t = can_board_swap(now_pos, next_pos);
-                        if (t.is_valid && t.diff < trans.diff) {
-                            trans = t;
-                            min_cost_dir = d;
-                        }
-                    }
-                }
-                assert(min_cost_dir != -1);
-                board_swap(trans);
-                //cerr << total_distance << ' ' << moves.size() << '\n';
-                // assign
-                now_pos += dir[min_cost_dir]; dist = now_pos.distance(dst_pos);
-                //vis(1);
-            }
-            // 到着したので fix
-            fixed[dst_pos.i][dst_pos.j] = true;
-        }
-
-        void solve() {
+        void target_swap_annealing() {
 
             auto get_temp = [](double start_temp, double end_temp, double t, double T) {
                 return end_temp + (start_temp - end_temp) * (T - t) / T;
             };
 
-            // TODO: ノーコストの board swap も入れる -> あんまよくないかも
-            // TODO: 遷移率の向上
             int loop = 0, valid = 0, accepted = 0;
             double start_time = timer.elapsedMs(), now_time, end_time = 7500;
             while ((now_time = timer.elapsedMs()) < end_time) {
@@ -824,7 +852,7 @@ namespace NSolver {
 
                 valid++;
 
-                double temp = get_temp(2.0, 0.0, now_time - start_time, end_time - start_time);
+                double temp = get_temp(3.0, 0.0, now_time - start_time, end_time - start_time);
                 double prob = exp(-t.diff / temp);
 
                 if (rnd.next_double() < prob) {
@@ -834,62 +862,118 @@ namespace NSolver {
 
             }
             dump("annealing", loop, valid, accepted, total_distance, timer.elapsedMs());
+        }
 
-            // route に沿って揃えていく
-            // TODO: route のアレンジ
-            for (int idx = 0; idx < N * N; idx++) {
-                NodePtr nto = target[route[idx].i][route[idx].j];
-                move_node(nto);
-                if (false) {
-                    // board swap
-                    for (int i = 1; i <= N; i++) {
-                        for (int j = 1; j < N; j++) {
-                            if (board[i][j]->c == board[i][j + 1]->c) {
-                                Trans t = can_board_swap(i, j, i, j + 1);
-                                assert(t.is_valid);
-                                if (t.diff < 0) {
-                                    board_swap(t);
-                                }
-                            }
+        void move_node(NodePtr nto) {
+            // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
+            // TODO: 移動のバリエーションを考慮　極小 dfs / beamsearch とか？
+            auto now_pos = nto->other->p;
+            auto dst_pos = nto->p;
+
+            int dist = now_pos.distance(dst_pos);
+            while (now_pos != dst_pos) {
+                // なるべく他のセルを巻き込んで total_cost が 2 減るような方向を選びたい
+                Trans trans; trans.diff = 1000;
+                int min_cost_dir = -1;
+                for (int d = 0; d < 4; d++) {
+                    auto next_pos = now_pos + dir[d];
+                    int ndist = next_pos.distance(dst_pos);
+                    if (!fixed[next_pos.i][next_pos.j] && ndist < dist) {
+                        // 大前提として、着目しているセルの到達距離は減る
+                        // 交換対象となるセルの到達距離も縮むならなお良い
+                        Trans t = can_board_swap(now_pos, next_pos);
+                        if (t.is_valid && t.diff < trans.diff) {
+                            trans = t;
+                            min_cost_dir = d;
                         }
                     }
-                    for (int i = 1; i < N; i++) {
-                        for (int j = 1; j <= N; j++) {
-                            if (board[i][j]->c == board[i + 1][j]->c) {
-                                Trans t = can_board_swap(i, j, i + 1, j);
-                                assert(t.is_valid);
-                                if (t.diff < 0) {
-                                    board_swap(t);
-                                }
+                }
+                assert(min_cost_dir != -1);
+                board_swap(trans);
+                //cerr << total_distance << ' ' << moves.size() << '\n';
+                now_pos += dir[min_cost_dir]; dist = now_pos.distance(dst_pos);
+            }
+            // 到着したので fix
+            fixed[dst_pos.i][dst_pos.j] = true;
+        }
+
+        void post_process() {
+            if (true) {
+                // board swap
+                for (int i = 1; i <= N; i++) {
+                    for (int j = 1; j < N; j++) {
+                        if (board[i][j]->c == board[i][j + 1]->c) {
+                            Trans t = can_board_swap(i, j, i, j + 1);
+                            assert(t.is_valid);
+                            if (t.diff < 0) {
+                                board_swap(t);
                             }
                         }
                     }
                 }
-                if (true) {
-                    // target swap でコストが減らせるなら愚直に減らす
-                    vector<vector<Point>> pts(C + 1);
-                    for (int i = 1; i <= N; i++) {
-                        for (int j = 1; j <= N; j++) {
-                            if (fixed[i][j]) continue;
-                            pts[target[i][j]->c].emplace_back(i, j);
-                        }
-                    }
-                    for (int c = 1; c <= C; c++) {
-                        int np = pts[c].size();
-                        for (int i = 0; i < np - 1; i++) {
-                            for (int j = i + 1; j < np; j++) {
-                                Trans t = can_target_swap(pts[c][i], pts[c][j]);
-                                if (t.diff < 0) {
-                                    target_swap(t);
-                                    // cerr << t << endl;
-                                    // vis(1);
-                                }
+                for (int i = 1; i < N; i++) {
+                    for (int j = 1; j <= N; j++) {
+                        if (board[i][j]->c == board[i + 1][j]->c) {
+                            Trans t = can_board_swap(i, j, i + 1, j);
+                            assert(t.is_valid);
+                            if (t.diff < 0) {
+                                board_swap(t);
                             }
                         }
                     }
                 }
             }
+            if (true) {
+                // target swap でコストが減らせるなら愚直に減らす
+                vector<vector<Point>> pts(C + 1);
+                for (int i = 1; i <= N; i++) {
+                    for (int j = 1; j <= N; j++) {
+                        if (fixed[i][j]) continue;
+                        pts[target[i][j]->c].emplace_back(i, j);
+                    }
+                }
+                for (int c = 1; c <= C; c++) {
+                    int np = pts[c].size();
+                    for (int i = 0; i < np - 1; i++) {
+                        for (int j = i + 1; j < np; j++) {
+                            Trans t = can_target_swap(pts[c][i], pts[c][j]);
+                            if (t.diff < 0) {
+                                target_swap(t);
+                                // cerr << t << endl;
+                                // vis(1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        void move_nodes() {
+            // route に沿って揃えていく
+            // TODO: route のアレンジ
+            for (int idx = 0; idx < N * N; idx++) {
+                NodePtr nto = target[route[idx].i][route[idx].j];
+
+                auto dst_pos = nto->p;
+                if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
+                    // nto の色が既に揃っている場合
+                    // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
+                    target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
+                    fixed[dst_pos.i][dst_pos.j] = true;
+                }
+                else {
+                    move_node(nto);
+                }
+
+                post_process();
+                //vis(1);
+            }
             dump("routing", timer.elapsedMs());
+        }
+
+        void solve() {
+            target_swap_annealing();
+            move_nodes();
         }
 
         std::string str() const {
@@ -955,15 +1039,15 @@ namespace NSolver {
                 cv::rectangle(img, roi2, cv::Scalar(0, 255, 255), 3);
             }
             // arrow
-            for (int i = 1; i <= N; i++) {
-                for (int j = 1; j <= N; j++) {
-                    auto pf = board[i][j]->p;
-                    cv::Point cvpf(grid_size * (pf.j + 0.5), grid_size * (pf.i + 0.5));
-                    auto pt = board[i][j]->other->p;
-                    cv::Point cvpt(grid_size * (pt.j + 0.5), grid_size * (pt.i + 0.5));
-                    cv::arrowedLine(img, cvpf, cvpt, cv::Scalar(0, 255, 255), 1, 8, 0, 0.1);
-                }
-            }
+            //for (int i = 1; i <= N; i++) {
+            //    for (int j = 1; j <= N; j++) {
+            //        auto pf = board[i][j]->p;
+            //        cv::Point cvpf(grid_size * (pf.j + 0.5), grid_size * (pf.i + 0.5));
+            //        auto pt = board[i][j]->other->p;
+            //        cv::Point cvpt(grid_size * (pt.j + 0.5), grid_size * (pt.i + 0.5));
+            //        cv::arrowedLine(img, cvpf, cvpt, cv::Scalar(0, 255, 255), 1, 8, 0, 0.1);
+            //    }
+            //}
             cv::imshow("img", img);
             cv::waitKey(delay);
         }
@@ -982,7 +1066,7 @@ int main() {
 #ifdef LOCAL_MODE
     std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\2.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -991,10 +1075,13 @@ int main() {
 
     init(in);
 
-    auto spiral = generate_spiral(N); // 移動は常に spiral
+    auto route = generate_route(N);
+
+    // 螺旋状に 11..22..33..CC を配置したときのコストを求めたい
+    // TODO: 螺旋ではなく複雑に入り組んだ連結成分であるほうが望ましいはず… -> とりあえず二重らせんにしてみる　効果は微妙…？
+    auto spiral = generate_spiral(N);
     vector<int> perm;
     for (int c = 1; c <= C; c++) perm.push_back(c);
-    // 螺旋状に 11..22..33..CC を配置したときのコストを求めたい
     double elapsed = timer.elapsedMs();
     auto assign = NFlow::calc_assign(spiral, perm);
 
@@ -1011,6 +1098,7 @@ int main() {
             j = rnd.next_int(C);
         } while (i == j);
         std::swap(perm[i], perm[j]);
+        //shuffle_vector(perm, rnd);
         assign = NFlow::calc_assign(spiral, perm);
         if (assign.total_cost < best_assign.total_cost) {
             best_assign = assign;
@@ -1019,17 +1107,18 @@ int main() {
         }
         loop++;
     }
+
     dump("climbing assign", best_assign.total_cost, loop, timer.elapsedMs());
 
-    NSolver::State state(best_assign, spiral);
-
-    //state.vis();
+    NSolver::State state(best_assign, route);
 
     state.solve();
 
     state.output(out);
 
     dump("answer", state.moves.size(), timer.elapsedMs());
+
+    //state.vis();
 
     return 0;
 }
