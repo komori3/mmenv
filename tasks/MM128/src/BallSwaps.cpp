@@ -255,7 +255,6 @@ Path generate_double_spiral(int N) {
             break;
         }
     }
-    assert(spiral.size() == N * N);
     return spiral;
 }
 
@@ -290,29 +289,26 @@ Path generate_spiral(int N) {
     return spiral;
 }
 
-Path generate_route(int N) {
-    vector<std::tuple<double, double, int, int>> tup;
+std::map<int, Path> generate_order(int N) {
+    vector<std::tuple<int, double, int, int>> tup;
     double ci = N / 2.0 + 0.5, cj = ci;
     for (int i = 1; i <= N; i++) {
         for (int j = 1; j <= N; j++) {
-            double dist = abs(i - ci) + abs(j - cj);
+            int dist = (int)(abs(i - ci) + abs(j - cj) + 1e-6);
             double rad = atan2(i - ci, j - cj);
             tup.emplace_back(dist, rad, i, j);
         }
     }
     sort(tup.begin(), tup.end());
     std::reverse(tup.begin(), tup.end());
-    // TODO: 距離ごとに偏角ソート
-
-    Path route;
+    std::map<int, Path> order_map;
     for (const auto& t : tup) {
-        double _, __;
-        int i, j;
-        std::tie(_, __, i, j) = t;
-        route.emplace_back(i, j);
+        int dist, i, j;
+        double _;
+        std::tie(dist, _, i, j) = t;
+        order_map[dist].emplace_back(i, j);
     }
-
-    return route;
+    return order_map;
 }
 
 Path generate_zigzag(int N) {
@@ -671,29 +667,32 @@ namespace NSolver {
 
     struct State {
         NFlow::Result assign; // 割当て
-        Path route; // 移動する順番
-        vector<vector<bool>> fixed; // 移動終了したか？
+
+        std::map<int, Path> order_map; // (中心からの距離, 点列)
 
         vector<vector<NodePtr>> board; // 目的地情報付き現在地
         vector<vector<NodePtr>> target;   // 現在地情報付き目的地
+        vector<vector<bool>> fixed; // 移動終了した点
 
-        CC conn;
+        CC conn; // 連結成分を扱う構造体
 
         vector<Move> moves; // 移動履歴
-        int total_distance;
+
+        int total_distance; // 割当てした各点の (現在位置, 目標位置) のマンハッタン距離の総和
 
         // 2 つの遷移を考える
 
-        // 1. 4-adjacent な 2 点の現在地を入れ替える
+        // 1. 4-adjacent な 2 点の'現在地'を入れ替える
         // -> move に対応　移動コストが 1 増える
+        // -> ただし、同色の場合はポインタの交換のみ行い、移動回数は増加させなくてよい
 
-        // 2. 任意の 2 点の目的地を入れ替える
-        // -> 完成盤面をいじる操作
+        // 2. 任意の 2 点の'目的地'を入れ替える
+        // -> 目標盤面をいじる操作
         // -> 移動コストが生じない（!）
         // -> 連結成分条件を保つ必要がある
 
-        State(const NFlow::Result& assign, const Path& route) :
-            assign(assign), route(route),
+        State(const NFlow::Result& assign, const std::map<int, Path>& order_map) :
+            assign(assign), order_map(order_map),
             fixed(N + 2, vector<bool>(N + 2, true)),
             board(N + 2, vector<NodePtr>(N + 2, nullptr)),
             target(N + 2, vector<NodePtr>(N + 2, nullptr)),
@@ -705,6 +704,9 @@ namespace NSolver {
             }
 
             memset(conn.T, 0, sizeof(cc_type) * 1024);
+
+            // 割当てから board (現在の状態), target (目標の状態) を生成
+            // 割り当てられた各 (現在, 目標) 点のペアは、互いへの参照を持つ
             for (int c = 1; c <= C; c++) {
                 for (const auto& n2n : assign.color_to_assign[c]) {
                     const auto& from = n2n.first;
@@ -775,6 +777,15 @@ namespace NSolver {
                 moves.emplace_back(t.i1, t.j1, t.i2, t.j2);
             }
             total_distance += t.diff;
+        }
+
+        void undo_board_swap(const Trans& t) {
+            total_distance -= t.diff;
+            if (board[t.i1][t.j1]->c != board[t.i2][t.j2]->c) {
+                moves.pop_back();
+            }
+            std::swap(board[t.i1][t.j1]->p, board[t.i2][t.j2]->p);
+            std::swap(board[t.i1][t.j1], board[t.i2][t.j2]);
         }
 
         Trans can_target_swap(int i1, int j1, int i2, int j2) {
@@ -864,6 +875,8 @@ namespace NSolver {
             dump("annealing", loop, valid, accepted, total_distance, timer.elapsedMs());
         }
 
+
+
         void move_node(NodePtr nto) {
             // ノード nfrom をノード nto に最短パスで移動させる　移動禁止領域: fixed
             // TODO: 移動のバリエーションを考慮　極小 dfs / beamsearch とか？
@@ -888,24 +901,23 @@ namespace NSolver {
                         }
                     }
                 }
-                assert(min_cost_dir != -1);
                 board_swap(trans);
-                //cerr << total_distance << ' ' << moves.size() << '\n';
                 now_pos += dir[min_cost_dir]; dist = now_pos.distance(dst_pos);
             }
             // 到着したので fix
             fixed[dst_pos.i][dst_pos.j] = true;
         }
 
-        void post_process() {
+        int post_process() {
+            int num_improved = 0;
             if (true) {
                 // board swap
                 for (int i = 1; i <= N; i++) {
                     for (int j = 1; j < N; j++) {
                         if (board[i][j]->c == board[i][j + 1]->c) {
                             Trans t = can_board_swap(i, j, i, j + 1);
-                            assert(t.is_valid);
                             if (t.diff < 0) {
+                                num_improved++;
                                 board_swap(t);
                             }
                         }
@@ -915,8 +927,8 @@ namespace NSolver {
                     for (int j = 1; j <= N; j++) {
                         if (board[i][j]->c == board[i + 1][j]->c) {
                             Trans t = can_board_swap(i, j, i + 1, j);
-                            assert(t.is_valid);
                             if (t.diff < 0) {
+                                num_improved++;
                                 board_swap(t);
                             }
                         }
@@ -938,35 +950,47 @@ namespace NSolver {
                         for (int j = i + 1; j < np; j++) {
                             Trans t = can_target_swap(pts[c][i], pts[c][j]);
                             if (t.diff < 0) {
+                                num_improved++;
                                 target_swap(t);
-                                // cerr << t << endl;
                                 // vis(1);
                             }
                         }
                     }
                 }
             }
+            return num_improved;
         }
 
         void move_nodes() {
             // route に沿って揃えていく
-            // TODO: route のアレンジ
-            for (int idx = 0; idx < N * N; idx++) {
-                NodePtr nto = target[route[idx].i][route[idx].j];
+            // TODO: order のアレンジ
+            vector<std::pair<int, Path>> dist_to_points(order_map.rbegin(), order_map.rend());
 
-                auto dst_pos = nto->p;
-                if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
-                    // nto の色が既に揃っている場合
-                    // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
-                    target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
-                    fixed[dst_pos.i][dst_pos.j] = true;
-                }
-                else {
-                    move_node(nto);
-                }
+            for (const auto& elem : dist_to_points) {
+                int dist = elem.first;
+                Path points = elem.second;
+                // 到達距離の長い順にソートしてみる
+                std::sort(points.begin(), points.end(), [&](const Point& p1, const Point& p2) {
+                    NodePtr np1f = board[p1.i][p1.j], np1t = np1f->other;
+                    NodePtr np2f = board[p2.i][p2.j], np2t = np2f->other;
+                    return np1f->p.distance(np1t->p) > np2f->p.distance(np2t->p);
+                });
+                for (const auto& p : points) {
+                    NodePtr nto = target[p.i][p.j];
 
-                post_process();
-                //vis(1);
+                    auto dst_pos = nto->p;
+                    if (board[dst_pos.i][dst_pos.j]->c == nto->c) {
+                        // nto の色が既に揃っている場合
+                        // nto の役割と from_map[dst_pos.i][dst_pos.j]->other の役割をチェンジ
+                        target_swap(nto->p, board[dst_pos.i][dst_pos.j]->other->p);
+                        fixed[dst_pos.i][dst_pos.j] = true;
+                    }
+                    else {
+                        move_node(nto);
+                    }
+
+                    post_process();
+                }
             }
             dump("routing", timer.elapsedMs());
         }
@@ -1064,9 +1088,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\2.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\6.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\2.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\6.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;
@@ -1075,28 +1099,32 @@ int main() {
 
     init(in);
 
-    auto route = generate_route(N);
+    // 入り組んだ形状の連結成分の方が各点からの距離が小さくなりそう -> とりあえず螺旋？
+    // 螺旋状に 11..22..33..CC と配置したときのコストを求めたい
 
-    // 螺旋状に 11..22..33..CC を配置したときのコストを求めたい
-    // TODO: 螺旋ではなく複雑に入り組んだ連結成分であるほうが望ましいはず… -> とりあえず二重らせんにしてみる　効果は微妙…？
+    // 螺旋ではなく複雑に入り組んだ連結成分であるほうが望ましい？
+    //   -> とりあえず二重らせんにしてみたが、効果は微妙そうだった
+
+    // 螺旋状に盤面を埋める点列を生成
     auto spiral = generate_spiral(N);
+    // 埋める色の順列
     vector<int> perm;
     for (int c = 1; c <= C; c++) perm.push_back(c);
+
+    // 初期盤面 (board) の各点と目標盤面 (target) の各点を最大重みマッチングで割当て
+    // コストはマンハッタン距離
     double elapsed = timer.elapsedMs();
     auto assign = NFlow::calc_assign(spiral, perm);
-
     dump("first assign", assign.total_cost, timer.elapsedMs() - elapsed);
 
-    // 順列変更山登り
-    // TODO: いい感じに統合したい
+    // 螺旋状に埋めていく色の順列を 2-swap で変更して山登り
+    // TODO: もっと賢く
     auto best_assign(assign);
     vector<int> best_perm = perm;
     int loop = 0;
-    while (timer.elapsedMs() < 3000) {
+    while (timer.elapsedMs() < 3000) { // 長すぎ...？
         int i = rnd.next_int(C), j;
-        do {
-            j = rnd.next_int(C);
-        } while (i == j);
+        do { j = rnd.next_int(C); } while (i == j);
         std::swap(perm[i], perm[j]);
         //shuffle_vector(perm, rnd);
         assign = NFlow::calc_assign(spiral, perm);
@@ -1107,10 +1135,14 @@ int main() {
         }
         loop++;
     }
-
     dump("climbing assign", best_assign.total_cost, loop, timer.elapsedMs());
 
-    NSolver::State state(best_assign, route);
+    // 初期盤面の各点を目標盤面に近づける順番
+    // (中心からのマンハッタン距離, 偏角) でソートしたものを使用
+    // 遠いものから埋めていく
+    auto order_map = generate_order(N);
+
+    NSolver::State state(best_assign, order_map);
 
     state.solve();
 
