@@ -81,8 +81,8 @@ def set_bgcolor(row: list):
             if max_score == min_score:
                 row[col]['bgcolor'] = rgb(*col_green)
             else:
-                row[col]['bgcolor'] = get_color(
-                    (row[col]['value'] - min_score) / (max_score - min_score))
+                # row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
+                row[col]['bgcolor'] = get_color((max_score - row[col]['value']) / (max_score - min_score))
         else:
             row[col]['bgcolor'] = rgb(*col_red)
     return row
@@ -168,7 +168,7 @@ def run_applet(config_path, config, tag, sol, seed):
 
     os.chdir(tester_dir)
 
-    tester_cmd = ['java', '-jar', tester_name, '-no', '-sd', str(seed), '-lo', output_dir, '-ps', '-dl', '10']
+    tester_cmd = ['java', '-jar', tester_name, '-no', '-sd', str(seed), '-lo', output_dir, '-ps', '-dl', '1', '-na']
 
     print(' '.join(tester_cmd))
     subprocess.run(tester_cmd)

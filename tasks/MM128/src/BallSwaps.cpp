@@ -1044,8 +1044,21 @@ namespace NSolver {
             // TODO: order のアレンジ
             vector<std::pair<int, Path>> dist_to_points(order_map.rbegin(), order_map.rend());
 
-            // TODO: 時間配分をうまく考える
+            double base_ms = timer.elapsedMs();
+            double total_ms = 9000.0 - base_ms, single_ms = total_ms / (N * N);
+            // 掛けてよい時間: single_ms * npoints
+            vector<double> time_limits(N, 0.0);
+            for (const auto& elem : dist_to_points) {
+                time_limits[elem.first] = elem.second.size() * single_ms;
+            }
+            dump(time_limits);
+            dump(std::accumulate(time_limits.begin(), time_limits.end(), 0.0));
+            for (int i = N - 1; i > 0; i--) time_limits[i - 1] += time_limits[i];
+            for (int i = 0; i < N; i++) time_limits[i] += base_ms;
+            dump(time_limits);
+
             int gain = 0;
+            double TT = timer.elapsedMs();
             for (const auto& elem : dist_to_points) {
                 int dist = elem.first;
 
@@ -1056,7 +1069,10 @@ namespace NSolver {
                 vector<Trans> best_moves;
 
                 Path orders(elem.second);
-                for (int loop = 0; loop < 3; loop++) {
+                int loop = 0;
+                //for (int loop = 0; loop < 3; loop++) {
+                do { // 一度は実行
+                    loop++;
                     int checkpoint = get_checkpoint();
                     int prev_dist = total_distance, prev_moves = moves.size();
                     for (const auto& p : orders) {
@@ -1088,10 +1104,12 @@ namespace NSolver {
                         break;
                     }
                     shuffle_vector(orders, rnd);
-                }
+                } while (timer.elapsedMs() < time_limits[dist]);
 
                 gain += best_score;
                 transition(best_moves);
+                //dump(dist, timer.elapsedMs() - TT);
+                TT = timer.elapsedMs();
             }
 
             dump(gain, gain + moves.size());
@@ -1191,9 +1209,9 @@ int main() {
     cin.tie(0);
 
 #ifdef LOCAL_MODE
-    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\7.in");
+    std::ifstream ifs("C:\\dev\\TCMM\\problems\\MM128\\in\\5.in");
     std::istream& in = ifs;
-    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\7.out");
+    std::ofstream ofs("C:\\dev\\TCMM\\problems\\MM128\\out\\5.out");
     std::ostream& out = ofs;
 #else
     std::istream& in = cin;

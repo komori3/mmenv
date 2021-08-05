@@ -2,8 +2,6 @@
 
 import flask
 import tasks
-# import problems
-# import submit
 
 app = flask.Flask(__name__)
 app.register_blueprint(tasks.app)
