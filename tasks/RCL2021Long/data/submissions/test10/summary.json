@@ -1,0 +1,308 @@
+{
+  "submission_datetime": "2021-09-09 04:49:35",
+  "tag": "test10",
+  "src": "main.cpp",
+  "results": [
+    {
+      "seed": 1,
+      "score": 4128427.0,
+      "elapsed_ms": 1267.6,
+      "status": "AC"
+    },
+    {
+      "seed": 2,
+      "score": 4328478.0,
+      "elapsed_ms": 1267.5,
+      "status": "AC"
+    },
+    {
+      "seed": 3,
+      "score": 4082916.0,
+      "elapsed_ms": 1217.3,
+      "status": "AC"
+    },
+    {
+      "seed": 4,
+      "score": 4480979.0,
+      "elapsed_ms": 1317.6,
+      "status": "AC"
+    },
+    {
+      "seed": 5,
+      "score": 3933628.0,
+      "elapsed_ms": 1217.2,
+      "status": "AC"
+    },
+    {
+      "seed": 6,
+      "score": 4073966.0,
+      "elapsed_ms": 1117.1,
+      "status": "AC"
+    },
+    {
+      "seed": 7,
+      "score": 3843036.0,
+      "elapsed_ms": 1217.1,
+      "status": "AC"
+    },
+    {
+      "seed": 8,
+      "score": 3624623.0,
+      "elapsed_ms": 1217.4,
+      "status": "AC"
+    },
+    {
+      "seed": 9,
+      "score": 4144268.0,
+      "elapsed_ms": 1217.5,
+      "status": "AC"
+    },
+    {
+      "seed": 10,
+      "score": 4214291.0,
+      "elapsed_ms": 1317.3,
+      "status": "AC"
+    },
+    {
+      "seed": 11,
+      "score": 4665112.0,
+      "elapsed_ms": 1167.1,
+      "status": "AC"
+    },
+    {
+      "seed": 12,
+      "score": 3777175.0,
+      "elapsed_ms": 1317.8,
+      "status": "AC"
+    },
+    {
+      "seed": 13,
+      "score": 4384742.0,
+      "elapsed_ms": 1267.1,
+      "status": "AC"
+    },
+    {
+      "seed": 14,
+      "score": 3951676.0,
+      "elapsed_ms": 1167.1,
+      "status": "AC"
+    },
+    {
+      "seed": 15,
+      "score": 4283080.0,
+      "elapsed_ms": 1317.4,
+      "status": "AC"
+    },
+    {
+      "seed": 16,
+      "score": 4376586.0,
+      "elapsed_ms": 1317.7,
+      "status": "AC"
+    },
+    {
+      "seed": 17,
+      "score": 4713671.0,
+      "elapsed_ms": 1217.6,
+      "status": "AC"
+    },
+    {
+      "seed": 18,
+      "score": 4120827.0,
+      "elapsed_ms": 1166.9,
+      "status": "AC"
+    },
+    {
+      "seed": 19,
+      "score": 4648998.0,
+      "elapsed_ms": 1117.1,
+      "status": "AC"
+    },
+    {
+      "seed": 20,
+      "score": 4704921.0,
+      "elapsed_ms": 1317.5,
+      "status": "AC"
+    },
+    {
+      "seed": 21,
+      "score": 4214756.0,
+      "elapsed_ms": 1267.3,
+      "status": "AC"
+    },
+    {
+      "seed": 22,
+      "score": 3957548.0,
+      "elapsed_ms": 1217.3,
+      "status": "AC"
+    },
+    {
+      "seed": 23,
+      "score": 3801189.0,
+      "elapsed_ms": 1217.3,
+      "status": "AC"
+    },
+    {
+      "seed": 24,
+      "score": 4360688.0,
+      "elapsed_ms": 1217.0,
+      "status": "AC"
+    },
+    {
+      "seed": 25,
+      "score": 3925769.0,
+      "elapsed_ms": 1217.4,
+      "status": "AC"
+    },
+    {
+      "seed": 26,
+      "score": 4671989.0,
+      "elapsed_ms": 1317.2,
+      "status": "AC"
+    },
+    {
+      "seed": 27,
+      "score": 3965336.0,
+      "elapsed_ms": 1117.1,
+      "status": "AC"
+    },
+    {
+      "seed": 28,
+      "score": 4364126.0,
+      "elapsed_ms": 1217.2,
+      "status": "AC"
+    },
+    {
+      "seed": 29,
+      "score": 4818053.0,
+      "elapsed_ms": 1217.3,
+      "status": "AC"
+    },
+    {
+      "seed": 30,
+      "score": 3972271.0,
+      "elapsed_ms": 1217.4,
+      "status": "AC"
+    },
+    {
+      "seed": 31,
+      "score": 4522302.0,
+      "elapsed_ms": 1318.0,
+      "status": "AC"
+    },
+    {
+      "seed": 32,
+      "score": 4396325.0,
+      "elapsed_ms": 1417.9,
+      "status": "AC"
+    },
+    {
+      "seed": 33,
+      "score": 4452280.0,
+      "elapsed_ms": 1267.3,
+      "status": "AC"
+    },
+    {
+      "seed": 34,
+      "score": 3967560.0,
+      "elapsed_ms": 1217.2,
+      "status": "AC"
+    },
+    {
+      "seed": 35,
+      "score": 4237982.0,
+      "elapsed_ms": 1317.6,
+      "status": "AC"
+    },
+    {
+      "seed": 36,
+      "score": 4185620.0,
+      "elapsed_ms": 1167.1,
+      "status": "AC"
+    },
+    {
+      "seed": 37,
+      "score": 4401658.0,
+      "elapsed_ms": 1317.4,
+      "status": "AC"
+    },
+    {
+      "seed": 38,
+      "score": 4044278.0,
+      "elapsed_ms": 1217.4,
+      "status": "AC"
+    },
+    {
+      "seed": 39,
+      "score": 4846801.0,
+      "elapsed_ms": 1217.6,
+      "status": "AC"
+    },
+    {
+      "seed": 40,
+      "score": 3942285.0,
+      "elapsed_ms": 1217.0,
+      "status": "AC"
+    },
+    {
+      "seed": 41,
+      "score": 3952556.0,
+      "elapsed_ms": 1267.5,
+      "status": "AC"
+    },
+    {
+      "seed": 42,
+      "score": 4081432.0,
+      "elapsed_ms": 1367.7,
+      "status": "AC"
+    },
+    {
+      "seed": 43,
+      "score": 4390003.0,
+      "elapsed_ms": 1267.6,
+      "status": "AC"
+    },
+    {
+      "seed": 44,
+      "score": 3897217.0,
+      "elapsed_ms": 1317.6,
+      "status": "AC"
+    },
+    {
+      "seed": 45,
+      "score": 4072098.0,
+      "elapsed_ms": 1167.1,
+      "status": "AC"
+    },
+    {
+      "seed": 46,
+      "score": 4650614.0,
+      "elapsed_ms": 1117.4,
+      "status": "AC"
+    },
+    {
+      "seed": 47,
+      "score": 4464795.0,
+      "elapsed_ms": 1117.4,
+      "status": "AC"
+    },
+    {
+      "seed": 48,
+      "score": 4527443.0,
+      "elapsed_ms": 1067.5,
+      "status": "AC"
+    },
+    {
+      "seed": 49,
+      "score": 4610615.0,
+      "elapsed_ms": 1217.7,
+      "status": "AC"
+    },
+    {
+      "seed": 50,
+      "score": 4361310.0,
+      "elapsed_ms": 1217.9,
+      "status": "AC"
+    }
+  ],
+  "score": 212538299.0
+}

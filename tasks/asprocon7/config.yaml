@@ -1,0 +1,12 @@
+id: 5
+tag: 'asprocon7'
+name: '第7回 Asprova プログラミングコンテスト'
+category: 'AtCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_list: ./data/seeds.txt
+generator: ./src/build/generator
+judge: ./src/build/judge
+source: /mnt/c/dev/heuristic/tasks/asprocon7/src/main.cpp
+metric: greater
+timelimit_ms: 10000

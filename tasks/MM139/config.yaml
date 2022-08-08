@@ -1,0 +1,11 @@
+id: 12
+tag: 'MM139'
+name: 'Marathon Match 139 - PipeConnector'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: /mnt/c/Users/komori3/OneDrive/dev/compro/heuristic/tasks/MM139/src/PipeConnector.cpp
+metric: yours_div_max
+timelimit_ms: 10000

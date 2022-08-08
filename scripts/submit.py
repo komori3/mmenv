@@ -199,8 +199,8 @@ class TCTaskRunner(TaskRunnerBase):
 
         self.solver_path = os.path.abspath(os.path.join('solver'))  # tmp
 
-        self.build_cmd = ['g++-7', '-O3', '-Wall', '-Wextra',
-                          '-std=gnu++11', '-o', self.solver_path, self.source_path]
+        self.build_cmd = ['g++-9', '-O3', '-Wall', '-Wextra',
+                          '-std=gnu++17', '-o', self.solver_path, self.source_path]
 
         if self.args.vis:
             self.build_cmd += [
@@ -284,6 +284,8 @@ class TCTaskRunner(TaskRunnerBase):
         if self.args.test is not None:
             shutil.rmtree(self.submissions_dir)
 
+class AHCTaskRunner(TaskRunnerBase):
+    pass
 
 if __name__ == "__main__":
     timestamp = datetime.now()

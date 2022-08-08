@@ -1,9 +1,12 @@
 .vscode
 include
-tasks/*/data/submissions
-tasks/*/src/build
 venv-mm
-solver
 __pycache__
-*.jar
+solver
+*.in
+*.out
+*.err
+*.txt
+tasks/*/src/build
 tasks/*/tools
+tasks/*/tester

@@ -1,0 +1,12 @@
+id: 6
+tag: 'RCL2021Long'
+name: 'RECRUIT 日本橋ハーフマラソン 2021〜増刊号〜'
+category: 'AtCoder Marathon'
+
+input_dir: ./data/in
+submissions_dir: ./data/submissions
+seed_list: ./data/seeds.txt
+judge: ./tester/judge.py
+source: /mnt/c/dev/heuristic/tasks/RCL2021Long/src/main.cpp
+metric: greater
+timelimit_ms: 10000

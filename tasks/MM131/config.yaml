@@ -1,0 +1,11 @@
+id: 9
+tag: 'MM131'
+name: 'Marathon Match 131 - StopTheElves'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: /mnt/c/dev/heuristic/tasks/MM131/src/StopTheElves.cpp
+metric: yours_div_max
+timelimit_ms: 10000

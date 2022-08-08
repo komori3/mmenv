@@ -1,0 +1,607 @@
+{
+  "submission_datetime": "2021-07-28 09:42:19",
+  "tag": "trivial",
+  "results": [
+    {
+      "seed": 1,
+      "score": 137.0,
+      "elapsed_ms": 3.0,
+      "status": "AC"
+    },
+    {
+      "seed": 2,
+      "score": 180.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 3,
+      "score": 191.0,
+      "elapsed_ms": 3.4,
+      "status": "AC"
+    },
+    {
+      "seed": 4,
+      "score": 165.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 5,
+      "score": 198.0,
+      "elapsed_ms": 2.6,
+      "status": "AC"
+    },
+    {
+      "seed": 6,
+      "score": 158.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 7,
+      "score": 182.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 8,
+      "score": 247.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 9,
+      "score": 148.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 10,
+      "score": 185.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 11,
+      "score": 108.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 12,
+      "score": 247.0,
+      "elapsed_ms": 2.4,
+      "status": "AC"
+    },
+    {
+      "seed": 13,
+      "score": 154.0,
+      "elapsed_ms": 2.4,
+      "status": "AC"
+    },
+    {
+      "seed": 14,
+      "score": 203.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 15,
+      "score": 157.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 16,
+      "score": 203.0,
+      "elapsed_ms": 2.4,
+      "status": "AC"
+    },
+    {
+      "seed": 17,
+      "score": 212.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 18,
+      "score": 117.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 19,
+      "score": 143.0,
+      "elapsed_ms": 2.3,
+      "status": "AC"
+    },
+    {
+      "seed": 20,
+      "score": 163.0,
+      "elapsed_ms": 2.3,
+      "status": "AC"
+    },
+    {
+      "seed": 21,
+      "score": 189.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 22,
+      "score": 180.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 23,
+      "score": 199.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 24,
+      "score": 123.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 25,
+      "score": 170.0,
+      "elapsed_ms": 2.4,
+      "status": "AC"
+    },
+    {
+      "seed": 26,
+      "score": 208.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 27,
+      "score": 251.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 28,
+      "score": 168.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 29,
+      "score": 212.0,
+      "elapsed_ms": 3.2,
+      "status": "AC"
+    },
+    {
+      "seed": 30,
+      "score": 217.0,
+      "elapsed_ms": 3.2,
+      "status": "AC"
+    },
+    {
+      "seed": 31,
+      "score": 108.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 32,
+      "score": 174.0,
+      "elapsed_ms": 3.0,
+      "status": "AC"
+    },
+    {
+      "seed": 33,
+      "score": 153.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 34,
+      "score": 340.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 35,
+      "score": 182.0,
+      "elapsed_ms": 2.6,
+      "status": "AC"
+    },
+    {
+      "seed": 36,
+      "score": 137.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 37,
+      "score": 163.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 38,
+      "score": 142.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 39,
+      "score": 199.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 40,
+      "score": 138.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 41,
+      "score": 127.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 42,
+      "score": 133.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 43,
+      "score": 196.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 44,
+      "score": 133.0,
+      "elapsed_ms": 2.5,
+      "status": "AC"
+    },
+    {
+      "seed": 45,
+      "score": 296.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 46,
+      "score": 150.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 47,
+      "score": 155.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 48,
+      "score": 146.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 49,
+      "score": 194.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 50,
+      "score": 133.0,
+      "elapsed_ms": 3.5,
+      "status": "AC"
+    },
+    {
+      "seed": 51,
+      "score": 138.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 52,
+      "score": 176.0,
+      "elapsed_ms": 1.8,
+      "status": "AC"
+    },
+    {
+      "seed": 53,
+      "score": 135.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 54,
+      "score": 122.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 55,
+      "score": 196.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 56,
+      "score": 143.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 57,
+      "score": 217.0,
+      "elapsed_ms": 2.3,
+      "status": "AC"
+    },
+    {
+      "seed": 58,
+      "score": 152.0,
+      "elapsed_ms": 2.8,
+      "status": "AC"
+    },
+    {
+      "seed": 59,
+      "score": 134.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 60,
+      "score": 236.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 61,
+      "score": 257.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 62,
+      "score": 303.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 63,
+      "score": 256.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 64,
+      "score": 193.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 65,
+      "score": 288.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 66,
+      "score": 200.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 67,
+      "score": 285.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 68,
+      "score": 198.0,
+      "elapsed_ms": 3.4,
+      "status": "AC"
+    },
+    {
+      "seed": 69,
+      "score": 187.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 70,
+      "score": 152.0,
+      "elapsed_ms": 5.0,
+      "status": "AC"
+    },
+    {
+      "seed": 71,
+      "score": 171.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 72,
+      "score": 245.0,
+      "elapsed_ms": 3.8,
+      "status": "AC"
+    },
+    {
+      "seed": 73,
+      "score": 117.0,
+      "elapsed_ms": 2.5,
+      "status": "AC"
+    },
+    {
+      "seed": 74,
+      "score": 279.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 75,
+      "score": 172.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 76,
+      "score": 163.0,
+      "elapsed_ms": 2.9,
+      "status": "AC"
+    },
+    {
+      "seed": 77,
+      "score": 135.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 78,
+      "score": 211.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 79,
+      "score": 178.0,
+      "elapsed_ms": 2.4,
+      "status": "AC"
+    },
+    {
+      "seed": 80,
+      "score": 88.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 81,
+      "score": 172.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 82,
+      "score": 257.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 83,
+      "score": 197.0,
+      "elapsed_ms": 2.1,
+      "status": "AC"
+    },
+    {
+      "seed": 84,
+      "score": 167.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 85,
+      "score": 118.0,
+      "elapsed_ms": 3.2,
+      "status": "AC"
+    },
+    {
+      "seed": 86,
+      "score": 150.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 87,
+      "score": 171.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 88,
+      "score": 246.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 89,
+      "score": 160.0,
+      "elapsed_ms": 2.3,
+      "status": "AC"
+    },
+    {
+      "seed": 90,
+      "score": 115.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 91,
+      "score": 123.0,
+      "elapsed_ms": 2.0,
+      "status": "AC"
+    },
+    {
+      "seed": 92,
+      "score": 212.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    },
+    {
+      "seed": 93,
+      "score": 188.0,
+      "elapsed_ms": 1.7,
+      "status": "AC"
+    },
+    {
+      "seed": 94,
+      "score": 187.0,
+      "elapsed_ms": 2.5,
+      "status": "AC"
+    },
+    {
+      "seed": 95,
+      "score": 216.0,
+      "elapsed_ms": 1.8,
+      "status": "AC"
+    },
+    {
+      "seed": 96,
+      "score": 160.0,
+      "elapsed_ms": 1.8,
+      "status": "AC"
+    },
+    {
+      "seed": 97,
+      "score": 192.0,
+      "elapsed_ms": 2.2,
+      "status": "AC"
+    },
+    {
+      "seed": 98,
+      "score": 129.0,
+      "elapsed_ms": 1.8,
+      "status": "AC"
+    },
+    {
+      "seed": 99,
+      "score": 159.0,
+      "elapsed_ms": 1.7,
+      "status": "AC"
+    },
+    {
+      "seed": 100,
+      "score": 217.0,
+      "elapsed_ms": 1.9,
+      "status": "AC"
+    }
+  ],
+  "score": 18077.0
+}

@@ -1,0 +1,11 @@
+id: 7
+tag: 'MM129'
+name: 'Marathon Match 129 - ChickenRun'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: /mnt/c/dev/heuristic/tasks/MM129/src/ChickenRun.cpp
+metric: yours_div_max
+timelimit_ms: 10000

@@ -1,0 +1,11 @@
+id: 10
+tag: 'MM132'
+name: 'Marathon Match 132 - BouncingBalls'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: /mnt/c/Users/komori3/OneDrive/dev/heuristic/tasks/MM132/src/BouncingBalls.cpp
+metric: yours_div_max
+timelimit_ms: 10000

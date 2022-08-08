@@ -1,0 +1,607 @@
+{
+  "submission_datetime": "2021-08-05 20:45:28",
+  "tag": "multi_trial",
+  "src": "BallSwaps.cpp",
+  "results": [
+    {
+      "seed": 1,
+      "score": 8.0,
+      "runtime": "5427 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 2,
+      "score": 3235.0,
+      "runtime": "6064 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 3,
+      "score": 50.0,
+      "runtime": "5427 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 4,
+      "score": 613.0,
+      "runtime": "5929 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 5,
+      "score": 1765.0,
+      "runtime": "5832 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 6,
+      "score": 2053.0,
+      "runtime": "5975 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 7,
+      "score": 130.0,
+      "runtime": "5429 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 8,
+      "score": 42.0,
+      "runtime": "5428 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 9,
+      "score": 416.0,
+      "runtime": "5453 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 10,
+      "score": 735.0,
+      "runtime": "5475 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 11,
+      "score": 782.0,
+      "runtime": "5774 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 12,
+      "score": 48.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 13,
+      "score": 57.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 14,
+      "score": 1317.0,
+      "runtime": "5555 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 15,
+      "score": 22.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 16,
+      "score": 465.0,
+      "runtime": "5522 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 17,
+      "score": 92.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 18,
+      "score": 938.0,
+      "runtime": "6410 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 19,
+      "score": 301.0,
+      "runtime": "5483 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 20,
+      "score": 1088.0,
+      "runtime": "5946 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 21,
+      "score": 1556.0,
+      "runtime": "6311 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 22,
+      "score": 86.0,
+      "runtime": "5450 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 23,
+      "score": 1570.0,
+      "runtime": "6315 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 24,
+      "score": 144.0,
+      "runtime": "5449 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 25,
+      "score": 319.0,
+      "runtime": "5450 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 26,
+      "score": 694.0,
+      "runtime": "5503 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 27,
+      "score": 110.0,
+      "runtime": "5453 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 28,
+      "score": 2397.0,
+      "runtime": "6411 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 29,
+      "score": 672.0,
+      "runtime": "6052 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 30,
+      "score": 262.0,
+      "runtime": "5448 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 31,
+      "score": 1037.0,
+      "runtime": "5526 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 32,
+      "score": 810.0,
+      "runtime": "5512 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 33,
+      "score": 11.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 34,
+      "score": 1221.0,
+      "runtime": "5539 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 35,
+      "score": 480.0,
+      "runtime": "5462 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 36,
+      "score": 107.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 37,
+      "score": 144.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 38,
+      "score": 1431.0,
+      "runtime": "5769 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 39,
+      "score": 430.0,
+      "runtime": "5747 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 40,
+      "score": 566.0,
+      "runtime": "5475 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 41,
+      "score": 15.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 42,
+      "score": 1729.0,
+      "runtime": "6565 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 43,
+      "score": 1981.0,
+      "runtime": "5856 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 44,
+      "score": 131.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 45,
+      "score": 426.0,
+      "runtime": "5490 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 46,
+      "score": 83.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 47,
+      "score": 296.0,
+      "runtime": "5453 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 48,
+      "score": 280.0,
+      "runtime": "5477 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 49,
+      "score": 203.0,
+      "runtime": "5480 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 50,
+      "score": 529.0,
+      "runtime": "5463 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 51,
+      "score": 47.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 52,
+      "score": 22.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 53,
+      "score": 8.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 54,
+      "score": 2244.0,
+      "runtime": "6335 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 55,
+      "score": 119.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 56,
+      "score": 963.0,
+      "runtime": "5802 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 57,
+      "score": 637.0,
+      "runtime": "5602 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 58,
+      "score": 1460.0,
+      "runtime": "5583 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 59,
+      "score": 1082.0,
+      "runtime": "5587 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 60,
+      "score": 7.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 61,
+      "score": 155.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 62,
+      "score": 93.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 63,
+      "score": 678.0,
+      "runtime": "5490 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 64,
+      "score": 1373.0,
+      "runtime": "5849 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 65,
+      "score": 1229.0,
+      "runtime": "5527 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 66,
+      "score": 1376.0,
+      "runtime": "6180 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 67,
+      "score": 1027.0,
+      "runtime": "5651 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 68,
+      "score": 228.0,
+      "runtime": "5455 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 69,
+      "score": 662.0,
+      "runtime": "5583 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 70,
+      "score": 655.0,
+      "runtime": "5929 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 71,
+      "score": 187.0,
+      "runtime": "5490 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 72,
+      "score": 1047.0,
+      "runtime": "5618 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 73,
+      "score": 595.0,
+      "runtime": "5455 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 74,
+      "score": 43.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 75,
+      "score": 1559.0,
+      "runtime": "5882 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 76,
+      "score": 1003.0,
+      "runtime": "5606 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 77,
+      "score": 2181.0,
+      "runtime": "5706 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 78,
+      "score": 573.0,
+      "runtime": "5458 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 79,
+      "score": 114.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 80,
+      "score": 1782.0,
+      "runtime": "6038 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 81,
+      "score": 23.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 82,
+      "score": 1302.0,
+      "runtime": "5534 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 83,
+      "score": 406.0,
+      "runtime": "5680 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 84,
+      "score": 1099.0,
+      "runtime": "5513 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 85,
+      "score": 419.0,
+      "runtime": "5451 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 86,
+      "score": 679.0,
+      "runtime": "5502 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 87,
+      "score": 613.0,
+      "runtime": "5588 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 88,
+      "score": 8.0,
+      "runtime": "5444 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 89,
+      "score": 2691.0,
+      "runtime": "5857 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 90,
+      "score": 90.0,
+      "runtime": "5450 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 91,
+      "score": 1787.0,
+      "runtime": "5585 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 92,
+      "score": 633.0,
+      "runtime": "6035 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 93,
+      "score": 368.0,
+      "runtime": "5449 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 94,
+      "score": 318.0,
+      "runtime": "5566 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 95,
+      "score": 206.0,
+      "runtime": "5452 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 96,
+      "score": 80.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 97,
+      "score": 144.0,
+      "runtime": "5446 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 98,
+      "score": 567.0,
+      "runtime": "5482 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 99,
+      "score": 48.0,
+      "runtime": "5445 ms",
+      "status": "AC"
+    },
+    {
+      "seed": 100,
+      "score": 134.0,
+      "runtime": "5457 ms",
+      "status": "AC"
+    }
+  ]
+}

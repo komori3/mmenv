@@ -81,8 +81,8 @@ def set_bgcolor(row: list):
             if max_score == min_score:
                 row[col]['bgcolor'] = rgb(*col_green)
             else:
-                # row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
-                row[col]['bgcolor'] = get_color((max_score - row[col]['value']) / (max_score - min_score))
+                row[col]['bgcolor'] = get_color((row[col]['value'] - min_score) / (max_score - min_score))
+                # row[col]['bgcolor'] = get_color((max_score - row[col]['value']) / (max_score - min_score))
         else:
             row[col]['bgcolor'] = rgb(*col_red)
     return row
@@ -185,7 +185,7 @@ def show_result(tag, sol, seed):
 
         run_applet(config_path, config, tag, sol, seed)
 
-        return flask.render_template('vis/topcoder.html', title=tag)
+        return flask.redirect(f'/tasks/{tag}')
 
     else:
         

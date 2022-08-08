@@ -1,0 +1,11 @@
+id: 11
+tag: 'MM138'
+name: 'Marathon Match 138 - DiceRoller'
+category: 'TopCoder Marathon'
+
+submissions_dir: ./data/submissions
+seed_range: 1+100
+tester: ./tester/tester.jar
+source: /mnt/c/Users/komori3/OneDrive/dev/compro/heuristic/tasks/MM138/src/DiceRoller.cpp
+metric: yours_div_max
+timelimit_ms: 10000
