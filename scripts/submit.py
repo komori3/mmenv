@@ -61,9 +61,6 @@ def do_task_wrapper(param): return do_task(*param)
 
 class TaskRunnerBase:
 
-    def get_path(self, relpath):
-        return os.path.join(os.path.dirname(self.config_path), relpath)
-
     def __init__(self, args):
 
         self.timestamp = datetime.now()
@@ -93,6 +90,27 @@ class TaskRunnerBase:
         if args.vis:
             assert args.test is not None, f'Visualize mode is only available if args.test is True.'
 
+    def get_path(self, path):
+        '''
+        相対パスなら `config.yaml` を含むディレクトリ起点 / 絶対パスならそのまま
+        '''
+        return os.path.join(os.path.dirname(self.config_path), path)
+
+    def build(self):
+
+        self.solver_path = './solver'  # tmp
+
+        build_cmd = ['g++-9', '-O2', '-Wall', '-Wextra',
+                     '-std=c++17', '-o', self.solver_path, self.source_path]
+
+        if self.args.vis:
+            build_cmd += [
+                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
+                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
+            ]
+
+        subprocess.run(build_cmd).check_returncode()
+
 
 class GeneralTaskRunner(TaskRunnerBase):
 
@@ -110,21 +128,6 @@ class GeneralTaskRunner(TaskRunnerBase):
         self.judge_path = self.get_path(self.config['judge'])
         assert os.path.exists(
             self.judge_path), f'Judge program {self.judge_path} does not exist.'
-
-    def build(self):
-
-        self.solver_path = './solver'  # tmp
-
-        build_cmd = ['g++-9', '-O2', '-Wall', '-Wextra',
-                     '-std=c++17', '-o', self.solver_path, self.source_path]
-
-        if self.args.vis:
-            build_cmd += [
-                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
-                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
-            ]
-
-        subprocess.run(build_cmd).check_returncode()
 
     def do_tasks(self):
 
@@ -194,21 +197,6 @@ class TCTaskRunner(TaskRunnerBase):
             'seed_range'] if self.args.test is None else f'1+{self.args.test}'
 
         self.tester_path = self.get_path(self.config['tester'])
-
-    def build(self):
-
-        self.solver_path = os.path.abspath(os.path.join('solver'))  # tmp
-
-        self.build_cmd = ['g++-9', '-O3', '-Wall', '-Wextra',
-                          '-std=gnu++17', '-o', self.solver_path, self.source_path]
-
-        if self.args.vis:
-            self.build_cmd += [
-                '-I/usr/local/include/opencv4', '-L/usr/local/lib',
-                '-lopencv_core', '-lopencv_highgui', '-lopencv_imgproc'
-            ]
-
-        subprocess.run(self.build_cmd).check_returncode()
 
     def parse_result(self, line):
         result = {}
@@ -284,8 +272,139 @@ class TCTaskRunner(TaskRunnerBase):
         if self.args.test is not None:
             shutil.rmtree(self.submissions_dir)
 
+
+def do_task_ahc(seed: int, solver_exec: str, judge_exec: str, input_dir: str, output_dir: str, error_dir: str, timelimit_ms: int) -> dict:
+    # exec
+    input_file = os.path.join(input_dir, f'{seed:04d}.txt')
+    output_file = os.path.join(output_dir, f'{seed:04d}.out')
+    error_file = os.path.join(error_dir, f'{seed:04d}.err')
+    try:
+        with open(input_file, 'r', encoding='utf-8') as input:
+            with open(output_file, 'w', encoding='utf-8') as out:
+                with open(error_file, 'w', encoding='utf-8') as err:
+                    elapsed = perf_counter_ns()
+                    subprocess.run([solver_exec], stdin=input,
+                            stdout=out, stderr=err, timeout=timelimit_ms/1000.0)
+                    elapsed = perf_counter_ns() - elapsed
+    except subprocess.TimeoutExpired as e:
+        print(e)
+        return failed_with_status(seed, 'TLE')  # time limit exceeded
+    except Exception as e:
+        print(e)
+        return failed_with_status(seed, 'RE')  # runtime error
+    # judge
+    try:
+        judge_cmd = [judge_exec, input_file, output_file]
+        score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
+        score = float(list(map(str.strip, score[:-1].split('=')))[1])
+    except Exception as e:
+        print(e)
+        return failed_with_status(seed, 'JE')  # judge error
+
+    print(
+        f'seed = {seed}, score = {score}, elapsed_ms = {round(elapsed / 1000000.0, 1)}, status: AC')
+    return {'seed': seed, 'score': score, 'elapsed_ms': round(elapsed / 1000000.0, 1), 'status': 'AC'}
+
+
+def do_task_ahc_wrapper(param): return do_task_ahc(*param)
+
+
 class AHCTaskRunner(TaskRunnerBase):
-    pass
+
+    def __init__(self, args):
+        super().__init__(args)
+
+        self.seed_list_path = self.get_path(self.config['seed_list'])
+        assert os.path.exists(
+            self.seed_list_path), f'Seed list file {self.seed_list_path} does not exist.'
+
+        self.input_dir = self.get_path(self.config['input_dir'])
+        assert os.path.exists(
+            self.input_dir), f'Input directory {self.input_dir} does not exist.'
+
+        self.judge_path = self.get_path(self.config['judge'])
+        assert os.path.exists(
+            self.judge_path), f'Judge program {self.judge_path} does not exist.'
+
+    def do_tasks(self):
+
+        try:
+
+            input_dir = self.input_dir
+            output_dir = os.path.join(self.submission_dir, 'out')
+            error_dir = os.path.join(self.submission_dir, 'err')
+            os.makedirs(self.submission_dir)
+            os.makedirs(output_dir)
+            os.makedirs(error_dir)
+            shutil.copy2(self.source_path, self.submission_dir)
+
+            with open(self.seed_list_path, 'r', encoding='utf-8') as f:
+                seeds = [int(seed) for seed in str(
+                    f.read()).split('\n') if seed != '']
+                if self.args.test is not None:
+                    num_seeds = len(seeds)
+                    seeds = seeds[:min(num_seeds, self.args.test)]
+
+            summary = {}
+            summary['submission_datetime'] = self.timestamp.strftime(
+                "%Y-%m-%d %H:%M:%S")
+            summary['tag'] = self.args.tag
+            summary['src'] = os.path.basename(self.source_path)
+
+            tasks = []
+            for seed in seeds:
+                tasks.append([seed, self.solver_path, self.judge_path,
+                              input_dir, output_dir, error_dir, self.config['timelimit_ms']])
+
+            pool = Pool(self.args.njobs)
+            summary['results'] = pool.map(do_task_ahc_wrapper, tasks)
+
+            score = 0
+            for result in summary['results']:
+                score += result['score']
+
+            print(f'total score = {score}')
+            summary['score'] = score
+
+            summary_path = os.path.join(
+                self.submission_dir, 'summary.json')
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2)
+
+        except BaseException as e:
+
+            print(e)
+            sleep(1)
+            shutil.rmtree(self.submission_dir)
+            if self.args.test is not None:
+                shutil.rmtree(self.submissions_dir)
+            exit(1)
+
+        if self.args.test is not None:
+            shutil.rmtree(self.submissions_dir)
+
+
+
+def create_task_runner(args):
+
+    config_path = args.config
+    assert os.path.exists(config_path), f'Config file {config_path} does not exist.'
+    config_path = os.path.abspath(config_path)
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.load(f, Loader=SafeLoader)
+
+    category = config['category'].lower()
+
+    if category == 'topcoder marathon':
+        task_runner = TCTaskRunner(args)
+    elif category == 'ahc':
+        task_runner = AHCTaskRunner(args)
+    else:
+        task_runner = GeneralTaskRunner(args)
+
+    return task_runner
+
 
 if __name__ == "__main__":
     timestamp = datetime.now()
@@ -305,27 +424,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    config_path = args.config
-    assert os.path.exists(
-        config_path), f'Config file {config_path} does not exist.'
-    config_path = os.path.abspath(config_path)
-
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.load(f, Loader=SafeLoader)
-
-    topcoder_mode = config['category'].lower() == 'topcoder marathon'
+    task_runner = create_task_runner(args)
 
     try:
-
-        if topcoder_mode:
-            task_runner = TCTaskRunner(args)
-        else:
-            task_runner = GeneralTaskRunner(args)
         task_runner.build()
         task_runner.do_tasks()
-
     except Exception as e:
-
         print(e)
         exit(1)
 

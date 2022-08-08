@@ -4,8 +4,9 @@ name: 'AtCoder Heuristic Contest 012'
 category: 'AHC'
 
 submissions_dir: ./data/submissions
-seed_range: 1+100
-tester: ./tester/tester.jar
-source: /mnt/c/Users/komori3/OneDrive/dev/compro/heuristic/tasks/MM139/src/PipeConnector.cpp
-metric: yours_div_max
-timelimit_ms: 10000
+seed_list: ./tools/seeds.txt
+input_dir: ./tools/in
+judge: ./tools/target/release/vis
+source: /mnt/c/Users/komori3/OneDrive/dev/compro/heuristic/tasks/AHC012/src/solver.cpp
+metric: greater
+timelimit_ms: 3000

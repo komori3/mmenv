@@ -6,6 +6,7 @@ import json
 import yaml
 from yaml.loader import SafeLoader
 import subprocess
+import shutil
 
 from evaluator import extract_data, create_evaluator
 
@@ -14,6 +15,7 @@ app = flask.Blueprint('tasks', __name__)
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASKS_DIR = os.path.join(ROOT_DIR, 'tasks')
 WWW_DIR = os.path.join(ROOT_DIR, 'www')
+VIS_DIR = os.path.join(WWW_DIR, 'templates', 'vis')
 
 
 def load_task_config_yaml(task_tag: str):
@@ -181,11 +183,38 @@ def show_result(tag, sol, seed):
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.load(f, Loader=SafeLoader)
 
-    if config['category'].lower() == 'topcoder marathon':
+    category = config['category'].lower()
+
+    if category == 'topcoder marathon':
 
         run_applet(config_path, config, tag, sol, seed)
 
         return flask.redirect(f'/tasks/{tag}')
+
+    elif category == 'ahc':
+
+        os.chdir(os.path.join(TASKS_DIR, tag))
+
+        seed = int(seed)
+
+        submissions_dir = config['submissions_dir']
+        submission_dir = os.path.join(submissions_dir, sol)
+        input_dir = config['input_dir']
+        input_file = os.path.join(input_dir, f'{seed:04d}.txt')
+        output_file = os.path.join(submission_dir, 'out', f'{seed:04d}.out')
+
+        judge_path = config['judge']
+        judge_cmd = [judge_path, input_file, output_file]
+        print(judge_cmd)
+        score = subprocess.check_output(judge_cmd).decode(encoding='utf-8')
+        score = float(list(map(str.strip, score[:-1].split('=')))[1])
+        print(score)
+
+        src_html = 'vis.html'
+        dst_html = os.path.join(VIS_DIR, f'{tag}.html')
+        shutil.copy2(src_html, dst_html)
+
+        return flask.render_template(f'vis/{tag}.html')
 
     else:
         
