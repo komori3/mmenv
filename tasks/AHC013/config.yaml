@@ -1,0 +1,12 @@
+id: 14
+tag: 'AHC013'
+name: 'AtCoder Heuristic Contest 013'
+category: 'AHC'
+
+submissions_dir: ./data/submissions
+seed_list: ./tools/seeds.txt
+input_dir: ./tools/in
+judge: ./tools/target/release/vis
+source: /mnt/c/Users/komori3/OneDrive/dev/compro/heuristic/tasks/AHC013/src/solver.cpp
+metric: greater
+timelimit_ms: 3000
